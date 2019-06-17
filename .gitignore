@@ -46,3 +46,8 @@ env.sh
 foo
 
 .nyc_output
+evars.sh
+tools/logging-report.txt
+tools/logstuf.txt
+tools/quick.sh
+tools/scrape_errs.js
