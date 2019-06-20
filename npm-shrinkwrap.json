@@ -7277,9 +7277,9 @@
       }
     },
     "microgateway-edgeauth": {
-      "version": "3.0.0",
-      "resolved": "https://registry.npmjs.org/microgateway-edgeauth/-/microgateway-edgeauth-3.0.0.tgz",
-      "integrity": "sha512-9HoKrJBD9O6oXPgw4NT7rF8kAhcKXPIy6n0EZC7Lje9YtcARx2KkFkjB+7nhDGcz4onwAqQ760BslRTcQWapAw=="
+      "version": "3.0.1",
+      "resolved": "https://registry.npmjs.org/microgateway-edgeauth/-/microgateway-edgeauth-3.0.1.tgz",
+      "integrity": "sha512-GlI6PySoCRGx5bwedahRKOa4pXjq2VI4vo/uskrttpREeaq0nyy/xUvMGtG/u4bKxnlpLXXF3tdLyM3vk68/aQ=="
     },
     "microgateway-plugins": {
       "version": "3.0.0",
