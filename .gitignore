@@ -59,3 +59,5 @@ test-e2e-local/test3.yaml
 test-e2e-local/leddyr-eval-test-config-BK.yaml
 test-e2e-local/tmp_emg_file.yaml
 *.txt
+dev/*
+

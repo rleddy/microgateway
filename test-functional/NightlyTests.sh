@@ -30,7 +30,15 @@ PROXY_NAME="edgemicro_proxy_nightly"
 DEVELOPER_NAME="edgemicro_dev_nightly"
 DEVELOPER_APP_NAME="edgemicro_dev_app_nightly"
 
-EDGEMICRO=$(which edgemicro || echo edgemicro)
+echo $1
+which edgemicro
+#bash
+if [ -z "$1" ]
+then
+    EDGEMICRO=$(which edgemicro || echo edgemicro)
+else
+    EDGEMICRO="node cli/edgemicro"
+fi
 
 TIMESTAMP=`date "+%Y-%m-%d-%H"`
 LOGFILE="NightlyTestLog.$TIMESTAMP"

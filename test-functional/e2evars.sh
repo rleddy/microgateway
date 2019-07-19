@@ -19,4 +19,4 @@ fi
 cd ./test-functional
 pwd
 
-bash NightlyTests.sh
+bash NightlyTests.sh $1
