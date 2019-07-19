@@ -4632,7 +4632,8 @@
     },
     "microgateway-config": {
       "version": "3.0.1",
-      "resolved": "github:apigee/microgateway-config#377ff6a2640d9d863d16bd48615dbfc6d742bf2a",
+      "resolved": "https://registry.npmjs.org/microgateway-config/-/microgateway-config-3.0.1.tgz",
+      "integrity": "sha512-5L5MQWzFy7n5pUhHKuP7Qd/0u0n+GJjEToqaiZXrIyPzMZhOERm84czOmG57J0SLNlvrjexqJqFevxt10HDR5Q==",
       "requires": {
         "apigeetool": "^0.10.0",
         "async": "^1.5.2",
@@ -7125,7 +7126,8 @@
     },
     "microgateway-core": {
       "version": "3.0.1",
-      "resolved": "github:apigee/microgateway-core#c5d5f727d7dae4d2967e962db2e53bd440f2a8d4",
+      "resolved": "https://registry.npmjs.org/microgateway-core/-/microgateway-core-3.0.1.tgz",
+      "integrity": "sha512-vY6wnYY5l0E8gn/Kubihv4OrJKEQcfidijOhIOl+yD5h2/Sung0b2GZxNL9AK0mRhwg+ou4b9HPXsXnLEzO8Hw==",
       "requires": {
         "async": "~1.5.2",
         "debug": "~3.1.0",
@@ -12052,7 +12054,8 @@
     },
     "microgateway-plugins": {
       "version": "3.0.1",
-      "resolved": "github:apigee/microgateway-plugins#0cb75529262efd29ed7aa88fcdb641e1720feb16",
+      "resolved": "https://registry.npmjs.org/microgateway-plugins/-/microgateway-plugins-3.0.1.tgz",
+      "integrity": "sha512-QG2fj0YoiG1uSTL8KfPzITqf1oDPEkTEwJEg56HaCH5MjB3mcn0ccrZ6KB0HkutsPvI6zh+BlGf1ssGjTgcuOQ==",
       "requires": {
         "async": "^1.4.2",
         "debug": "^3.1.0",
