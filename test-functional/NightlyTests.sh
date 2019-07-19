@@ -39,6 +39,8 @@ then
 else
     EDGEMICRO="node cli/edgemicro"
 fi
+echo $EDGEMICRO
+
 
 TIMESTAMP=`date "+%Y-%m-%d-%H"`
 LOGFILE="NightlyTestLog.$TIMESTAMP"
