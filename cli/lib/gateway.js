@@ -24,7 +24,7 @@ module.exports = function() {
     return new Gateway();
 };
 
-function inialiaseMicroGatewayLogging() {
+function initaliaseMicroGatewayLogging(config) {
     // gateway from require
     gateway.Logging.init(config);
 }
@@ -101,7 +101,7 @@ Gateway.prototype.start = (options,cb) => {
         }
 
         config.uid = uuid();
-        inialiaseMicroGatewayLogging(config);
+        initaliaseMicroGatewayLogging(config);
 
         var opt = {};
         delete args.keys;
