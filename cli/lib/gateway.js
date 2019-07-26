@@ -342,8 +342,7 @@ function hasConfigChanged(oldConfig, newConfig) {
 
     //do not compare uid
     delete oldConfig['uid'];
-
-    
+    //
     if (_.isEqual(oldConfig, newConfig)) {
         debug("no changes detected");
         return false;

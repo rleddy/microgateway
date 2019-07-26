@@ -62,5 +62,5 @@ test-e2e-local/tmp_emg_file.yaml
 dev/*
 test-functional/NightlyTestLog.*
 test-functional/tmp_emg_file.yaml
-
+tools
 
