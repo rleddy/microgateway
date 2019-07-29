@@ -15,6 +15,7 @@ const MAX_CONNECT_FAIL_TIME = 200
 //
 var RLC = null;  // an instance if needed
 
+/*
 class RespawnIntervalManager {
   //
   constructor(opt) {
@@ -38,7 +39,7 @@ class RespawnIntervalManager {
  }
 
 }
-
+*/
 
 var gRespawnIntervalManager = false; //new RespawnIntervalManager();
 
@@ -698,9 +699,16 @@ class ClusterManager extends EventEmitter {
     this.reloading = true // turn off reloading during shutdown
     this.shuttingdown = true // when the child process are cleand up... terminate the healthcheck interval
     if ( this.healthCheckInterval ) clearInterval(this.healthCheckInterval)
-    this.stop();
-    cluster.disconnect(() => {
+    var safetyTimeout = setTimeout(() => {  // just in case this hangs
       clearOutStoppedProcesses()
+      this.stop();
+      cb()
+    },20000)
+    // this should do the trick
+    cluster.disconnect(() => {
+      clearTimeout(safetyTimeout);
+      clearOutStoppedProcesses()
+      this.stop();
       cb()
     })  // kill after disconnect by cleaning up
   }
