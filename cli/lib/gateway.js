@@ -135,9 +135,14 @@ Gateway.prototype.start = (options,cb) => {
             socket.on('message', (message) => {
                 if (message.command === 'reload') {
                     console.log('Recieved reload instruction. Proceeding to reload');
-                    mgCluster.reload(() => {
-                        console.log('Reload completed');
-                        socket.sendMessage(true);
+                    mgCluster.reload((msg) => {
+                        if ( typeof msg === 'string') {
+                            console.log(msg)
+                            socket.sendMessage({ 'reloaded' : false, 'message' : msg });
+                        } else {
+                            socket.sendMessage(true);
+                            console.log('Reload completed');
+                        }
                     });
                 } else if (message.command === 'stop') {
                     console.log('Recieved stop instruction. Proceeding to stop');

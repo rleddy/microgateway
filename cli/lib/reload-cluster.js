@@ -8,16 +8,12 @@ const cache = require('microgateway-plugins').memored;
 const PURGE_INTERVAL = 60000;
 //
 const DEFAULT_PROCESS_CHECK_INTERVAL = 10000
+const RAPID_REPLAY_INTERVAL_STOPPED_PROCESSES = 50
 const CALLBACK_TIMEOUT = 5000
+const MAX_CONNECT_FAIL_TIME = 200
 
 //
 var RLC = null;  // an instance if needed
-
-/**
- * @param opt
- * @returns {RespawnIntervalManager}
- * @constructor
- */
 
 class RespawnIntervalManager {
   //
@@ -33,15 +29,17 @@ class RespawnIntervalManager {
     return intervalForNextSpawn;
  }
 
+ getNextSpawnFromNow() {
+   return(this.getIntervalForNextSpawn(Date.now()))
+ }
+
 }
 
 
-
+var gRespawnIntervalManager = false;
 
 /**
- * Decorator for holding respawn timers
- *
- * @constructor
+ * TimerList class
  */
 class TimerList {
   //
@@ -53,91 +51,280 @@ class TimerList {
     this.items.forEach((item) => {
       clearTimeout(item);
     })
+    this.items = []
   }
   //
   add(id) {
-    this.items.push(id)
+    if ( this.items ) {
+      this.items.push(id)
+    }
+  }
+  //
+  addTimeout(cb,tlapse) {
+    return(setTimeout(cb,tlapse))
+  }
+
+  replaceTimeout(id,cb,tlapse) {
+    this.remove(id)
+    this.addTimeout(cb,tlapse)
   }
   //
   remove(id) {
-    this.items.splice(this.items.indexOf(id),1)
+    if ( (id !== undefined) && (id !== null) ) {
+      clearTimeout(id);
+      if ( this.items ) {
+        this.items.splice(this.items.indexOf(id),1)
+      }
+    }
+    return undefined
   }
   //
 }
 
-var extantTimers = new TimerList();
-
-
-var tClosers = {}
-var tOpeners = {}
-
-
-function cleanUpAllowedProcess() {  // walk through tracked processes
-  var wmap = cluster.workers;
-  for ( var wk in tOpeners ) {    // remove any processes that are dead and make room for new ones
-    var w = tOpeners[wk]  // processes are not in tOpeners before they are 'online' and 'connected'
-    if ( w.isDead() || !(w.isConnected()) ) {
-     delete tOpeners[wk]
-     if ( !(tClosers.hasOwnProperty(wk)) ) { // if the process is not already in the prune list then put it there.
-        tClosers[wk] = wmap[wk]
+class CallbackList {
+  constructor() {
+    this.items = []
+  }
+  //
+  clear() {
+    this.items.forEach((item) => {
+      clearTimeout(item);
+    })
+    this.items = []
+  }
+  //
+  add(cb) {
+    if ( this.items && (typeof cb === 'function' ) ) {
+      if ( this.items.indexOf(cb) < 0 ) {
+        this.items.push(cb)
       }
+    }
+  }
+  //
+  //
+  remove(cb) {
+    if ( typeof cb === 'function' ) {
+      this.items.splice(this.items.indexOf(cb),1)
+    }
+  }
+
+  runCallBacks() {
+    if ( this.items && (this.items.length > 0) ) {
+      this.items.forEach( cb => {
+        try {
+          cb()
+        } catch (e) {
+          console.log(e)
+        }
+      })  // when done eliminate
+      this.items = []
+    }
+  }
+
+
+}
+
+
+
+
+
+
+class WorkerInfo {
+  //
+  constructor(worker) {
+    this.request_disconnect = false
+    this.request_shutdown = false
+    this.connectedEvent = worker.isConnected()
+    this.ready = false
+    this.trackingStartTime = Date.now()
+    this.worker_key = worker.id
+    this.address = ''
+  }
+  // --connectTimeout--------------------------------------- 
+  // Check if more time has gone by for connecting than we can tolerate 
+  connectTimeout() {
+    var worker = cluster.workers[this.worker_key]
+    if ( worker !== undefined ) {
+      if ( !(worker.isConnected()) ) {
+        var onset = this.trackingStartTime
+        var diff = Date.now() - onset
+        //
+        //if ( diff > MAX_CONNECT_FAIL_TIME  )  console.log(`DISCONNECT TIMEOUT ${this.worker_key}`)
+        //
+        return ( diff > MAX_CONNECT_FAIL_TIME ) 
+      }
+    } else {
+      return true
+    }
+    return false
+  }
+
+}
+
+// GLOBAL
+// ---- ---- ---- ---- ---- ---- ----
+var gExtantTimers = new TimerList();
+var gStoppedProcCallbacks = new CallbackList();
+
+// keeping these as global variables.
+var tClosers = {}
+var tTracked = {}
+// ---- ---- ---- ---- ---- ---- ----
+
+
+// --shouldTrackWorker--------------------------------------- 
+// Decide if a worker should be put into or kept in the tracking map.
+function shouldTrackWorker(w,isTracked) {
+  var w_info = tTracked[w.id]
+  var alreadyTracked = (w_info !== undefined) 
+  var wrongTrackingState = isTracked ? !alreadyTracked : alreadyTracked
+  var itsDead = w.isDead()
+  var itLostConnection = isTracked && !(w.isConnected() && w_info.connectedEvent)
+  var itTimedoutWaitingForConnection = isTracked && w_info.connectTimeout()
+  var itsInClosers = tClosers.hasOwnProperty(w.id)
+  //
+  var somethingsWrong = (wrongTrackingState || itsDead || itLostConnection || itTimedoutWaitingForConnection || itsInClosers)
+  //
+  return(!somethingsWrong)
+}
+
+
+// --cleanUpTrackedProcess--------------------------------------- 
+// look through the tracked processes to see if anyone has died or disconnected
+// called by consonantProcesses
+function cleanUpTrackedProcess() {  // walk through tracked processes
+  var cw_map = cluster.workers;
+  for ( var wk in tTracked ) {    // remove any processes that are dead and make room for new ones
+    var worker = cw_map[wk]  // processes are in tTracked immedately after a fork and retain space until they fail
+    if ( worker === undefined ) {  // process is gone 
+      delete tTracked[wk]  // stop tracking this process // and put it nowhere... it is gone (delete tracking info)
+    } else if ( !shouldTrackWorker(worker,true) ) {
+      // moved tracking info
+      tClosers[wk] = tTracked[wk] // this should never overwrite ... but it could be checkd. Decided not to.
+      delete tTracked[wk]  // stop tracking this process
     }
   }
 }
 
 
+// --untrackTrackedProcesses--------------------------------------- 
+// During reloading or other terminating, there may be a need to stop all tracked processes.
+// This does not look at the cluster process list or check the processes in tTracked for health.
+// It just moves processes to the closers list and removes them form the tracked list.
+function untrackTrackedProcesses() {  // clear out tracked processes and put them in the die off list.
+  //
+  for ( var wk in tTracked ) {    // remove any processes that are dead and make room for new ones
+    tClosers[wk] = tTracked[wk]  // this should never overwrite ... but it could be checkd. Decided not to.
+    delete tTracked[wk]
+  }
+  //
+}
+
+
+
+// --clearOutStoppedProcesses--------------------------------------- 
+// --closePreconditions--------------------------------------- 
+
+// --closePreconditions--------------------------------------- 
+// TBD any reason that cleaning out stopped processs should proceed or not
 function closePreconditions() {
   return(true)
 }
 
 
-function clearOutStoppedProcesses() {
+
+// --clearOutStoppedProcesses--------------------------------------- 
+// Actively search for processes to dispense with. Try to stop any that are hanging around
+var gExtantTimerForStoppedProcess = null
+function clearOutStoppedProcesses(cb,threshold) {
+  if ( threshold === undefined ) {
+    threshold = 0
+  }
+  if ( gExtantTimerForStoppedProcess !== null ) {
+    gExtantTimers.remove(gExtantTimerForStoppedProcess)
+    gExtantTimerForStoppedProcess = null
+  }
+  if ( cb ) {
+    gStoppedProcCallbacks.add(cb)
+  }
+  //
   if ( closePreconditions() ) {
-    for ( var wk in tClosers ) {
-      var w = tClosers[wk]
-      if ( !(w.isDead()) && w.isConnected() ) {
-        w.disconnect()  // from the IPC
-      } else if ( !(w.isDead()) && !(w.isConnected()) ) {
-        w.kill('SIGKILL')
-      } else if ( w.isDead() ) {
-        delete tClosers[wk]
+    //
+    for ( var wk in tClosers ) {  // Look through the list of closed processes by key
+      var w = cluster.workers[wk]   // always get the current representation from the cluster (this object changes)
+      if ( w === undefined ) {
+        delete tClosers[wk]   // this process is now history
+      } else {
+        var w_info = tClosers[wk]
+        //
+        if ( !(w.isDead()) && w.isConnected() ) {     // If the processes is still live .. first disconnect it
+          try {
+            w.disconnect()  // from the IPC 
+            w_info.request_disconnect = true
+          } catch (e) {
+            // might have never connected
+            console.log(e)
+          }
+        } else if ( !(w.isDead()) && !(w.isConnected()) ) {   // The processes is no longer connected ... so kill it
+          w_info.request_shutdown = true
+          w.kill('SIGKILL')
+        } else if ( w.isDead() ) {    // This process is finally done (might get second opinion from OS)
+          delete tClosers[wk]         // remove it
+        }
+        //
       }
     }
-    if ( Object.keys(tClosers).length === 0  ) {
-      extantTimers.add(setTimeout(healthCheck,DEFAULT_PROCESS_CHECK_INTERVAL))
+    //  Depending on wheather there is more work to do wait and look again for change of state.
+    //  Otherwise, healthcheck is on an interval defined by the application and it will look there. 
+    if ( Object.keys(tClosers).length > threshold  ) {
+      gExtantTimerForStoppedProcess = gExtantTimers.addTimeout(() => { clearOutStoppedProcesses(cb,threshold) },RAPID_REPLAY_INTERVAL_STOPPED_PROCESSES)
     } else {
-      extantTimers.add(setTimeout(clearOutStoppedProcesses,50))
+      gStoppedProcCallbacks.runCallBacks()
     }
-    
+    //
+  } else {  // delay until preconditions clear e.g. waiting for some process to start
+    gExtantTimerForStoppedProcess = gExtantTimers.addTimeout(() => { clearOutStoppedProcesses(cb) },RAPID_REPLAY_INTERVAL_STOPPED_PROCESSES)
+  }
+}
+
+
+
+function workersFullHouse() {
+  var wantsmore = RLC.consonantProcesses();
+  var clearoutCount = Object.keys(tClosers).length
+  if ( clearoutCount > RLC.numWorkers ) {
+    clearOutStoppedProcesses(() => {
+      workersFullHouse()
+    },RLC.numWorker)
   } else {
-    extantTimers.add(setTimeout(clearOutStoppedProcesses,10))
-  }
-}
-
-
-
-function untrackTrackedProcesses() {  // clear out tracked processes and put them in the die off list.
-  //
-  var wmap = cluster.workers;
-  for ( var wk in tOpeners ) {    // remove any processes that are dead and make room for new ones
-    delete tOpeners[wk]
-    if ( !(tClosers.hasOwnProperty(wk)) ) { // if the process is not already in the prune list then put it there.
-      tClosers[wk] = wmap[wk]
+    if ( gRespawnIntervalManager && (wantsmore > 0) ) {
+      var intrval = gRespawnIntervalManager.getNextSpawnFromNow()
+      var iNextSpawn = gExtantTimers.addTimeout(() => { 
+        RLC.requestNewWorker();
+        gExtantTimers.remove(iNextSpawn)
+        workersFullHouse()
+      },intrval)
+    } else {
+      while ( wantsmore ) {
+        //console.log(wantsmore)
+        RLC.requestNewWorker()
+        wantsmore--;
+      }  
     }
   }
-  //
 }
 
 
 
-function healthCheck() {
-  clearOutStoppedProcesses()
+// --healthCheck--------------------------------------- 
+// Checks for processes that might be running and shouldn't be. And, will attempt to eliminate them.
+// Checks for processes that should be running and requests them. 
+// This should be set on an interval by the ClusterManager and works as a watchdog on processes in case events handlers fail to work
+function healthCheck(special) {
   if ( RLC ) {
-    var wantsmore = RLC.consonantProcesses();
-    while ( wantsmore ) {
-      RLC.requestNewWorker()
-      wantsmore--;
-    }
+    if ( RLC.reloading && !special ) return;
+    clearOutStoppedProcesses()
+    workersFullHouse()
   }
 }
 
@@ -146,16 +333,19 @@ function healthCheck() {
 const readyCommand = 'ready';
 
 class ClusterManager extends EventEmitter {
+
+  //
   constructor(file,opt) {
     super()
     //
     this.opt = {}
-    this.optionDefaults(opt)
     this.numWorkers = opt.workers
+    this.optionDefaults(opt)
     //
     this.readyEvent = 'online'
     this.reloading = false
-    this.callbackTO = null
+    this.callbackTO = null  // callback timeout
+    this.shuttingdown = false 
     //
     //this.readyEvent = opt.workerReadyWhen === 'started' ? 'online' : opt.workerReadyWhen === 'listening' ? 'listening' : 'message';
     // // //
@@ -163,9 +353,12 @@ class ClusterManager extends EventEmitter {
     this.setupClusterProcs(file)
     this.setUpClusterHandlers()
 
-    setInterval(healthCheck,DEFAULT_PROCESS_CHECK_INTERVAL)  // once in a while check to see if everything is the way it is supposed to be
+    this.healthCheckInterval = setInterval(() => {
+      healthCheck() 
+    },DEFAULT_PROCESS_CHECK_INTERVAL)  // once in a while check to see if everything is the way it is supposed to be
   }
   
+  // --optionDefaults--------------------------------------- 
   optionDefaults(opt) {
     // initializing opt with defaults if not provided
     this.numWorkers = this.numWorkers || cpuCount;
@@ -173,9 +366,10 @@ class ClusterManager extends EventEmitter {
     this.opt.workerReadyWhen = opt.workerReadyWhen || 'listening';
     this.opt.args = opt.args || [];
     this.opt.log = opt.log || {respawns: true};
-    this.opt.respawnIntervalManager = new RespawnIntervalManager({minRespawnInterval: opt.minRespawnInterval});
+    //gRespawnIntervalManager = new RespawnIntervalManager({minRespawnInterval: opt.minRespawnInterval});
   }
 
+  // --initializeCache--------------------------------------- 
   initializeCache() {
     //setup memored - a cache shared between worker processes. intro in 2.5.9
     cache.setup({
@@ -183,6 +377,7 @@ class ClusterManager extends EventEmitter {
     });
   }
   
+  // --setupClusterProcs--------------------------------------- 
   setupClusterProcs(file) {
     cluster.setupMaster({exec: file});
     cluster.settings.args = this.opt.args;
@@ -198,27 +393,24 @@ class ClusterManager extends EventEmitter {
     //
   }
 
+  // --setUpClusterHandlers--------------------------------------- 
   setUpClusterHandlers() {
     // Event handlers on the cluster
     // This exit event happens, whenever a worker exits.
 
     this.handleWorkerExit = (w) => {
       console.log(`handleWorkerExit ${w.id}`)
-      var wantMore = this.consonantProcesses()
-      nextTick(clearOutStoppedProcesses)
-      while ( wantMore > 0 ) {
-        this.requestNewWorker()
-        wantMore--
-      }
+      this.workerExit(w)
     }
 
     this.handleWorkerDisconnect = (w) => {
       console.log(`emitWorkerDisconnect ${w.id}`)
-      setTimeout(healthCheck,50)
+      this.workerDisconnect(w)
     }
 
     this.handleWorkerListening = (w, adr) => {
       console.log(`handleWorkerListening ${w.id}`)
+      this.workerConnect(w,adr)
       if ( this.readyEvent === 'listening' ) {
         this.handleReadyEvent(w)
       }
@@ -226,6 +418,7 @@ class ClusterManager extends EventEmitter {
   
     this.handleWorkerOnline = (w) => {
       console.log(`worker ${w.id} is online ...`)
+      this.workerConnect(w)
       if ( this.readyEvent === 'online' ) {
         this.handleReadyEvent(w)
       }
@@ -244,168 +437,197 @@ class ClusterManager extends EventEmitter {
       if ( this.readyEvent === 'message' && (!arg || ( arg && arg.cmd === readyCommand ) )) {
         this.handleReadyEvent(w)
       } else if ( arg && arg.cmd === 'disconnect' ) {
-                                  //replaceAndTerminateWorker(w);
+        this.handleWorkerDisconnect(w)
       }
     })
 
   }
 
-  callReloadCallback() {
-    if ( (this.callbackTO !== undefined) && (this.callbackTO !== null) ) {
-      clearTimeout(this.callbackTO)
-      this.callbackTO = undefined
-    }
-    this.reloading = false;
-    if ( this.readyCb !== undefined ) this.readyCb();
-    this.readyCb = undefined
-  }
 
-  handleReloadReadyEvents() {
-    if ( this.readyCb ) {
-      //
-      var wantMore = this.consonantProcesses()
-      //
-      nextTick(clearOutStoppedProcesses)
-      //
-      if ( !wantMore ) {
-        this.callReloadCallback()
-      } else { // Put out checkup out there to see if more is still wanted 
-        this.callbackTO = setTimeout(() => {
-            RLC.callbackTO = undefined
-            RLC.callReloadCallback()
-            setTimeout(healthCheck,100)
-        },CALLBACK_TIMEOUT)
+  workerConnect(w,adr) {
+    var wk = w.id
+    var worker = cluster.workers[wk]
+    if ( worker !== undefined ) {
+      if ( tTracked.hasOwnProperty(wk) ) {
+        var w_info = tTracked[wk]
+        w_info.connectedEvent = true
+        w_info.address = adr ? adr : ''
       }
     }
   }
 
+
+  // --workerExit---------------------------------------
+  // Cleanup tracked processes, which should attempt to put the worker into the closer list if it is still active
+  workerExit(w) {
+    cleanUpTrackedProcess()
+    var w_info = tClosers[w.id] // the process should be here now if it is not undefined
+    if ( w_info !== undefined ) {
+      if ( w_info.request_disconnect || w_info.request_shutdown ) { // if we are removing this processes keep removing it
+        setImmediate(clearOutStoppedProcesses) // this should have been done, but keep pushing on it
+      } else {  // this is a process we lost and did not attempt to remove
+        process.nextTick(workersFullHouse)
+      }
+    } else {
+      setImmediate(healthCheck)  // make sure that there are enough processes and that we are not keeping zombies around
+    }
+  }
+  
+  workerDisconnect(w) {
+    var w_info = tClosers[w.id] // the process should be here now if it is not undefined
+    if ( (w_info === undefined) || w_info.request_disconnect ) {
+      setImmediate(clearOutStoppedProcesses) // this should have been done, but keep pushing on it
+    } else {
+      setImmediate(healthCheck)
+    }
+  }
+
+  // --callReloadCallback--------------------------------------- 
+  // This is called when there are enough processes being tracked or
+  // when enough time has gone by that the client deserves a response
+  finallyReloadCallback() {
+    this.callabackTO = gExtantTimers.remove(this.callabackTO)
+    if ( this.readyCb !== undefined ) {
+      this.readyCb();
+    }
+    this.readyCb = undefined
+  }
+
+  // --beginProcessStabilization--------------------------------------- 
+  beginProcessStabilization() {
+    setImmediate(() => {  // at the next chance clear out processes being stopped.
+      clearOutStoppedProcesses(() => { 
+        this.reloading = false; 
+      })
+    })
+  }
+
+  // --manageReloadCallBack--------------------------------------- 
+  manageReloadCallBack(cb) {
+    this.callbackTO = gExtantTimers.replaceTimeout(this.callbackTO,cb,CALLBACK_TIMEOUT)
+  }
+
+  // --handleReloadReadyEvents--------------------------------------- 
+  handleReloadReadyEvents() {
+    if ( this.readyCb ) {
+      //
+      var wantMore = this.consonantProcesses()  // returns the number of processes missing (and moves unusable processes to tClosers)
+      //
+      if ( !wantMore ) {
+        this.finallyReloadCallback()
+        this.beginProcessStabilization()
+      } else { // Put out checkup out there to see if more is still wanted
+        //
+        this.manageReloadCallBack(() => {
+          // getting enough processes took too long. So, this is finally called and not removed. 
+          // So, call the callback and leave it up to the health cneck to get things back on track
+          this.finallyReloadCallback()
+          this.beginProcessStabilization()
+        })
+        //
+      }
+    }
+  }
+
+  // --handleReadyEvent--------------------------------------- 
+  // Set the process state for ready when it achieves the applications 
+  // definition of readiness
   handleReadyEvent(w) {
-    console.log(`HANDLING READY EVENT FOR ${w.id}`)
     if ( this.reloading ) {
       this.handleReloadReadyEvents()
     }
   }
 
   // -------------------------------------------------------
-
   // -------------------------------------------------------
-  run() {
-    this.forkWorkers()
-  }
 
-  reload(cb) {
-    this.refreshCache()
-    untrackTrackedProcesses()
-
-    this.reloading = true
-    this.readyCb = cb
-    //
-    // fork workers
-    this.forkWorkers()
-  }
-
-  terminate(cb) {
-    this.stop();
-    cluster.disconnect(cb)  // kill after disconnect
-  }
-
-  stop() {
-    if ( !cluster.isMaster ) return;
-    cluster.removeListener('exit', this.handleWorkerExit);
-    cluster.removeListener('disconnect', this.handleWorkerDisconnect);
-    cluster.removeListener('listening', this.handleWorkerListening);
-    cluster.removeListener('online', this.handleWorkerOnline);
-    this.stopExtantTimers()
-    channel.removeAllListeners();
-  }
-
+  
+  // --stopExtantTimers----------------------------------------------------
+  // pass to the tkmer manager instance
   stopExtantTimers() {
-    extantTimers.clear()
+    gExtantTimers.clear()
   }
 
-  // ----------------------------------------- 
+  // --stopExtantTimers----------------------------------------------------
+  // Request new workers as many times as set by the application
   forkWorkers() {
     for (var i = 0; i < this.numWorkers; i++) {
       this.requestNewWorker()
     }
   }
 
-  // ----------------------------------------- 
+  // --consonantProcesses----------------------------------------------------
   // at any time, this should be able to check on the 
   // known child processes and see if they are accounted for.
-  // ----------------------------------------- 
   consonantProcesses() {   // walk through the cluster worker list
     //
-    cleanUpAllowedProcess()
+    cleanUpTrackedProcess()
     //
-    var wmap = cluster.workers;
-    for ( var wk in wmap ) {
-      if ( !(tOpeners.hasOwnProperty(wk)) ) {
-        var w = wmap[wk];
-        var nW = Object.keys(tOpeners).length
-        if ( (nW < this.numWorkers ) && !(w.isDead()) && w.isConnected() ) {  // if it is working and not tracked, then track it unless maxed out
-          tOpeners[wk] = w
+    var cw_map = cluster.workers;
+    for ( var wk in cw_map ) {
+      if ( !(tTracked.hasOwnProperty(wk)) ) {
+        var worker = cw_map[wk];
+        var nW = Object.keys(tTracked).length
+        if ( (nW < this.numWorkers ) && shouldTrackWorker(worker,false) ) {  // if it is working and not tracked, then track it unless maxed out
+          tTracked[wk] = new WorkerInfo(worker)
         } else if ( !(tClosers.hasOwnProperty(wk)) ) { // if the process is not already in the prune list then put it there.
-          tClosers[wk] = wmap[wk]
+          tClosers[wk] = cw_map[wk]
         }
       }
     }
     //
-    var nW = Object.keys(tOpeners).length
+    var nW = Object.keys(tTracked).length
     var unborn = this.numWorkers - nW;
     //
     return unborn
   }
 
 
-
-
-  // --requestNewWorker--------------------------------------- 
+  // --requestNewWorker----------------------------------------------------
   // At any time, this should be able to ask for a new worker and have that request be accepted or rejected
   // depending on our criteria.
   // Here, there are some number of processes needed, but no more.
-  // ----------------------------------------- 
   requestNewWorker() {
-    var nW = Object.keys(tOpeners).length
-    if ( nW < this.numWorkers ) {
-      var wmap = cluster.workers;
-      for ( var wk in wmap ) {
-        var w = wmap[wk]
-        if ( !(tOpeners.hasOwnProperty(wk)) && !(w.isDead()) && w.isConnected() ) {
-          if ( !(tClosers.hasOwnProperty(wk)) ) {
-            tOpeners[wk] = w
-            return;  
-          }
+    var nW = Object.keys(tTracked).length  // assume that tracked processes are all healthy at this point.
+    if ( nW < this.numWorkers ) {          // deficit of tracked processes .. proceed
+      var cw_map = cluster.workers;          // look at the workers known to the cluster
+      for ( var wk in cw_map ) {
+        var worker = cw_map[wk] 
+        //
+        if ( shouldTrackWorker(worker,false) ) {  // found a healthy process not being tracked
+          tTracked[wk] = new WorkerInfo(worker)           // Then it can be used instead of a new fork
+          return;                                   // note: this path is unlikely but possible
         }
+        //
       }
-      // no excess processes needing a home
+      // no excess processes needing a home so create a new one
       this.doFork()  
     }
   }
 
 
-  // ----------------------------------------- 
+  // --refreshCache----------------------------------------------------
   refreshCache() {
     cache.clean(function(){});
   }
   
   
-  // ----------------------------------------- 
+  // --doFork----------------------------------------------------
   doFork() {
     //
     var nW = this.numWorkers  
-    if ( Object.keys(tOpeners).length < nW ) {
-  
-      var w = cluster.fork() //{WORKER_ID: wid});
-      //  
-      tOpeners[w.id] = w;
+    if ( Object.keys(tTracked).length < nW ) {
+      //
+      var worker = cluster.fork() //{WORKER_ID: wid});
+      //
+      tTracked[worker.id] = new WorkerInfo(worker)
       //
       // whenever worker sends a message, emit it to the channels
-      w.on('message', (message) => {
+      worker.on('message', (message) => {
         if ( this.opt.logger ) {
           this.opt.logger.writeLogRecord(message);
         }
-        this.emit('message', w, message);
+        this.emit('message', worker, message);
       });
       //
       // When a worker exits remove the worker reference from workers array, which holds all the workers
@@ -414,6 +636,61 @@ class ClusterManager extends EventEmitter {
       //
     }
   }
+
+
+  // -----stop--------------------------------------------------
+  // stop is called by terminate. The application does not call stop
+  stop() {
+    if ( !cluster.isMaster ) return;
+    cluster.removeListener('exit', this.handleWorkerExit);
+    cluster.removeListener('disconnect', this.handleWorkerDisconnect);
+    cluster.removeListener('listening', this.handleWorkerListening);
+    cluster.removeListener('online', this.handleWorkerOnline);
+    this.stopExtantTimers()
+ }
+
+
+
+  // ========================= Application methods ...  (public)
+  //
+  // -----run--------------------------------------------------
+  run() {
+    this.forkWorkers()
+  }
+
+  // -----reload--------------------------------------------------
+  reload(cb) {
+    if ( this.reloading ) {
+      cb("busy reloadng")
+    } else {
+      //
+      this.reloading = true // reloading is not reset until new processes are running and a sufficient number of stopped child processes are gone
+      //
+      this.refreshCache()
+      untrackTrackedProcesses()
+      //
+      this.readyCb = () => {
+        // the callback will defer the cb call until it is determined that the new processes are ready
+        cb()
+      }
+      //
+      // fork workers
+      this.forkWorkers()
+    }
+  }
+
+  // -----terminate--------------------------------------------------
+  terminate(cb) {
+    this.reloading = true // turn off reloading during shutdown
+    this.shuttingdown = true // when the child process are cleand up... terminate the healthcheck interval
+    if ( this.healthCheckInterval ) clearInterval(this.healthCheckInterval)
+    this.stop();
+    cluster.disconnect(() => {
+      clearOutStoppedProcesses()
+      cb()
+    })  // kill after disconnect by cleaning up
+  }
+
   
 }
 
