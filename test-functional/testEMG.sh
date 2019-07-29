@@ -509,7 +509,7 @@ stopEMG() {
   else
        sleep 10
        killall node
-       result=$?
+       #result=$?
        if [ $result -eq 0 ]; then
             logInfo "Successfully stopped EMG with status $result"
        else
