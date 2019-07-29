@@ -3,7 +3,7 @@
 // start agent.js :  This is the top of a cluster child
 
 const cluster = require('cluster');
-//const agentConfig = require('../../lib/agent-config');
+const agentConfig = require('../../lib/agent-config');
 const assert = require('assert');
 
 var args;
@@ -16,7 +16,6 @@ const argsJson = JSON.parse(args);
 assert(argsJson);
 
 
-/*
 agentConfig(argsJson, (e) => {
   if (e) {
     console.error('edge micro failed to start', e);
@@ -33,21 +32,3 @@ agentConfig(argsJson, (e) => {
     console.log('edge micro started');
   }
 });
-
-*/
-
-
-function check() {
-  if (!cluster.isMaster) {
-    if (process.send) process.send('online');
-    process.on('message', (message) => {
-      if (message === 'shutdown') {
-        process.exit(0);
-      }
-    });
-  } else {
-    console.log('edge micro started');
-  }
-}
-
-check()

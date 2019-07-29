@@ -18,7 +18,11 @@ var RLC = null;  // an instance if needed
 class RespawnIntervalManager {
   //
   constructor(opt) {
-    this.respawnInterval = opt.minRespawnInterval || 1;  // default to 1 sec
+    if ( opt ) {
+      this.respawnInterval = (opt.minRespawnInterval !== undefined) && (opt.minRespawnInterval >= 0) ? opt.minRespawnInterval : 1;  // default to 1 sec
+    } else {
+      this.minRespawnInterval = 1
+    }
     this.lastSpawn = Date.now();
   }
   //
@@ -36,7 +40,7 @@ class RespawnIntervalManager {
 }
 
 
-var gRespawnIntervalManager = false;
+var gRespawnIntervalManager = false; //new RespawnIntervalManager();
 
 /**
  * TimerList class
@@ -232,6 +236,15 @@ function closePreconditions() {
 }
 
 
+function requestShutdownNow(w,w_info) {
+  if ( w_info !== undefined ) {
+    w_info.request_shutdown = true
+  }
+  if ( w !== undefined ) {
+    w.kill('SIGKILL')
+  }
+}
+
 
 // --clearOutStoppedProcesses--------------------------------------- 
 // Actively search for processes to dispense with. Try to stop any that are hanging around
@@ -266,8 +279,7 @@ function clearOutStoppedProcesses(cb,threshold) {
             console.log(e)
           }
         } else if ( !(w.isDead()) && !(w.isConnected()) ) {   // The processes is no longer connected ... so kill it
-          w_info.request_shutdown = true
-          w.kill('SIGKILL')
+          requestShutdownNow(w,w_info)
         } else if ( w.isDead() ) {    // This process is finally done (might get second opinion from OS)
           delete tClosers[wk]         // remove it
         }
@@ -476,8 +488,10 @@ class ClusterManager extends EventEmitter {
   workerDisconnect(w) {
     var w_info = tClosers[w.id] // the process should be here now if it is not undefined
     if ( (w_info === undefined) || w_info.request_disconnect ) {
-      setImmediate(clearOutStoppedProcesses) // this should have been done, but keep pushing on it
+      requestShutdownNow(w,w_info)
+      clearOutStoppedProcesses() // this should have been done, but keep pushing on it
     } else {
+      requestShutdownNow(w,w_info)
       setImmediate(healthCheck)
     }
   }
