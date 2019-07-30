@@ -793,7 +793,7 @@ class ClusterManager extends EventEmitter {
       clearOutStoppedProcesses()
       this.stop();
       cb()
-    },20000)
+    },10000)
     // this should do the trick
     cluster.disconnect(() => {
       clearTimeout(safetyTimeout);
