@@ -1,6 +1,5 @@
 'use strict';
 const path = require('path');
-const os = require('os');
 const fs = require('fs');
 const net = require('net');
 const edgeconfig = require('microgateway-config');
@@ -17,14 +16,22 @@ const debug = require('debug')('microgateway');
 const jsdiff = require('diff');
 const _ = require('lodash');
 
+//const os = require('os');
+
 const Gateway = function() {};
 
 module.exports = function() {
     return new Gateway();
 };
 
+function initaliaseMicroGatewayLogging(config) {
+    // gateway from require
+    gateway.Logging.init(config);
+}
+
+
 Gateway.prototype.start = (options,cb) => {
-    const self = this;
+    //const self = this;
     try {
         fs.accessSync(ipcPath, fs.F_OK);
         console.error('Edgemicro seems to be already running.');
@@ -61,11 +68,15 @@ Gateway.prototype.start = (options,cb) => {
         targetEndpoint: options.target
     };
 
-    edgeconfig.get({
+    var configOptions = {
         source: source,
         keys: keys,
-        localproxy: localproxy
-    }, (err, config) => {
+        localproxy: localproxy,
+        org: options.org,
+        env: options.env
+    }
+
+    edgeconfig.get(configOptions, (err, config) => {
         if (err) {
             const exists = fs.existsSync(cache);
             console.error("failed to retieve config from gateway. continuing, will try cached copy..");
@@ -90,7 +101,8 @@ Gateway.prototype.start = (options,cb) => {
         }
 
         config.uid = uuid();
-        var logger = gateway.Logging.init(config,options);
+        initaliaseMicroGatewayLogging(config);
+
         var opt = {};
         delete args.keys;
         //set pluginDir
@@ -121,20 +133,25 @@ Gateway.prototype.start = (options,cb) => {
             }
             socket = new JsonSocket(socket);
             socket.on('message', (message) => {
-                if (message.command == 'reload') {
+                if (message.command === 'reload') {
                     console.log('Recieved reload instruction. Proceeding to reload');
-                    mgCluster.reload(() => {
-                        console.log('Reload completed');
-                        socket.sendMessage(true);
+                    mgCluster.reload((msg) => {
+                        if ( typeof msg === 'string') {
+                            console.log(msg)
+                            socket.sendMessage({ 'reloaded' : false, 'message' : msg });
+                        } else {
+                            socket.sendMessage(true);
+                            console.log('Reload completed');
+                        }
                     });
-                } else if (message.command == 'stop') {
+                } else if (message.command === 'stop') {
                     console.log('Recieved stop instruction. Proceeding to stop');
                     mgCluster.terminate(() => {
                         console.log('Stop completed');
                         socket.sendMessage(true);
                         process.exit(0);
                     });
-                } else if (message.command == 'status') {
+                } else if (message.command === 'status') {
                     var activeWorkers = mgCluster.activeWorkers();
                     socket.sendMessage(activeWorkers ? activeWorkers.length : 0);
                 }
@@ -179,9 +196,9 @@ Gateway.prototype.start = (options,cb) => {
         var reloadOnConfigChange = (oldConfig, cache, opts) => {
             console.log('Checking for change in configuration');
             if (configurl) opts.configurl = configurl;
-            var self = this;
+            //var self = this;
             edgeconfig.get(opts, (err, newConfig) => {
-                if(validator(newConfig) == false && !err) {
+                if(validator(newConfig) === false && !err) {
                     err = {};
                 }
                 if (err) {
@@ -209,14 +226,11 @@ Gateway.prototype.start = (options,cb) => {
 
         if (!shouldNotPoll) {
             setTimeout(() => {
-                reloadOnConfigChange(config, cache, {
-                    source: source,
-                    keys: keys
-                });
+                reloadOnConfigChange(config, cache, configOptions);
             }, pollInterval * 1000);
         }
         
-        if ( cb && (typeof cb == "function") ) {
+        if ( cb && (typeof cb === "function") ) {
             console.log("Calling cb")
             cb();
         }
@@ -271,7 +285,7 @@ Gateway.prototype.reload = (options) => {
     });
     socket.on('error', (error) => {
         if (error) {
-            if (error.code == 'ENOENT') {
+            if (error.code === 'ENOENT') {
                 console.error('edgemicro is not running.');
             }
         }
@@ -280,7 +294,7 @@ Gateway.prototype.reload = (options) => {
 };
 
 
-Gateway.prototype.stop = (options) => {
+Gateway.prototype.stop = ( /*options */ ) => {
     var socket = new JsonSocket(new net.Socket()); //Decorate a standard net.Socket with JsonSocket
     socket.on('connect', () => {
         socket.sendMessage({
@@ -297,7 +311,7 @@ Gateway.prototype.stop = (options) => {
     });
     socket.on('error', (error) => {
         if (error) {
-            if (error.code == 'ENOENT') {
+            if (error.code === 'ENOENT') {
                 console.error('edgemicro is not running.');
             }
         }
@@ -305,7 +319,7 @@ Gateway.prototype.stop = (options) => {
     socket.connect(ipcPath);
 };
 
-Gateway.prototype.status = (options) => {
+Gateway.prototype.status = ( /* options */ ) => {
     var socket = new JsonSocket(new net.Socket()); //Decorate a standard net.Socket with JsonSocket
     socket.on('connect', () => {
         socket.sendMessage({
@@ -318,7 +332,7 @@ Gateway.prototype.status = (options) => {
     });
     socket.on('error', (error)=> {
       if (error) {
-        if (error.code == 'ENOENT') {
+        if (error.code === 'ENOENT') {
           console.error('edgemicro is not running.');
           process.exit(1);
         }
@@ -333,8 +347,7 @@ function hasConfigChanged(oldConfig, newConfig) {
 
     //do not compare uid
     delete oldConfig['uid'];
-
-    
+    //
     if (_.isEqual(oldConfig, newConfig)) {
         debug("no changes detected");
         return false;
