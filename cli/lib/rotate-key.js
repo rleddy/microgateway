@@ -36,8 +36,11 @@ function isCPS(property) {
 	debug(property);
     for (var p in property) {
         if (property.hasOwnProperty(p)) {
-            if (property[p].name ===  "features.isCpsEnabled" && property[p].value ===  "true") {
-                cpsenabled = true;
+            if ( (property[p].name ===  "features.isCpsEnabled") && (typeof property[p].value !== "undefined") ) {
+				var b = property[p].value
+				if ( ((typeof b === 'string') && (b.toLocaleLowerCase() === 'true')) || ((typeof b === 'boolean') && b) ) {
+					cpsenabled = true;
+				}
             }
         }
     }

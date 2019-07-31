@@ -24,9 +24,14 @@ module.exports = function() {
     return new Gateway();
 };
 
-function initaliaseMicroGatewayLogging(config) {
+
+// initializeMicroGatewayLogging
+// All logging is initialized here. 
+// For logging to happend xalling initializeMicroGatewayLogging is required at some point early on in 
+// the flow of configuration
+function initializeMicroGatewayLogging(config,options) {
     // gateway from require
-    gateway.Logging.init(config);
+    gateway.Logging.init(config,options);
 }
 
 
@@ -101,7 +106,7 @@ Gateway.prototype.start = (options,cb) => {
         }
 
         config.uid = uuid();
-        initaliaseMicroGatewayLogging(config);
+        initializeMicroGatewayLogging(config,options);
 
         var opt = {};
         delete args.keys;
