@@ -20,6 +20,8 @@ const deploymentFx = require('./deploy-auth');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 edgeconfig.setConsoleLogger(writeConsoleLog);
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway private';
+
 const DEFAULT_HOSTS = 'default,secure';
 
 const Private = function() {};
@@ -31,7 +33,7 @@ module.exports = function() {
 // begins edgemicro configuration process
 Private.prototype.configureEdgemicro = function(options, cb) {
     if (!fs.existsSync(configLocations.getDefaultPath(options.configDir))) {
-        writeConsoleLog('error',"Missing %s, Please run 'edgemicro init'", configLocations.getDefaultPath(options.configDir))
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"Missing %s, Please run 'edgemicro init'", configLocations.getDefaultPath(options.configDir))
         return cb("Please call edgemicro init first")
     }
 
@@ -46,16 +48,16 @@ Private.prototype.configureEdgemicro = function(options, cb) {
     assert(options.mgmtUrl, 'mgmtUrl is required');
 
     const cache = configLocations.getCachePath(options.org, options.env);
-    writeConsoleLog('log','delete cache config');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'delete cache config');
     if (fs.existsSync(cache)) {
         fs.unlinkSync(cache);
-        writeConsoleLog('log','deleted ' + cache);
+        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'deleted ' + cache);
     }
 
     const targetPath = configLocations.getSourcePath(options.org, options.env);
     if (fs.existsSync(targetPath)) {
         fs.unlinkSync(targetPath);
-        writeConsoleLog('log','deleted ' + targetPath);
+        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'deleted ' + targetPath);
     }
 
     options.proxyName = this.name = 'edgemicro-auth';
@@ -86,7 +88,7 @@ Private.prototype.configureEdgemicro = function(options, cb) {
     var configFileDirectory = options.configDir || configLocations.homeDir;
 
     const that = this;
-    writeConsoleLog('log','init config');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'init config');
     edgeconfig.init({
         source: configLocations.getDefaultPath(options.configDir),
         targetDir: configFileDirectory,
@@ -98,19 +100,19 @@ Private.prototype.configureEdgemicro = function(options, cb) {
         options.internaldeployed = false;
         that.deployment.checkDeployedProxies(options, (err, options) => {
             if (err) {
-                writeConsoleLog('error',err);
+                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
                 if ( cb ) { cb(err) } else process.exit(1);
                 return;
             } else {
                 that.deployment.checkDeployedInternalProxies(options, (err, options) => {
                     if (err) {
-                        writeConsoleLog('error',err);
+                        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
                         if ( cb ) { cb(err) } else process.exit(1);
                         return;
                     } else {
                         that.configureEdgemicroWithCreds(options, (err) => {
                             if (err) {
-                                writeConsoleLog('error',err);
+                                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
                                 if ( cb ) { cb(err) } else process.exit(1);
                                 return;
                             }
@@ -180,7 +182,7 @@ Private.prototype.configureEdgeMicroInternalProxy = function configureEdgeMicroI
         function(parallelCb) {
             async.waterfall(calloutFlow, function(err /*, result */) {
                 if (err) {
-                    writeConsoleLog('log','error - editing apiproxy Callout.xml');
+                    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'error - editing apiproxy Callout.xml');
                     return parallelCb(err);
                 }
 
@@ -221,7 +223,7 @@ Private.prototype.configureEdgeMicroInternalProxy = function configureEdgeMicroI
         tasks.push(function(parallelCb) {
             async.waterfall(defaultFlow, function(err /*, result */) {
                 if (err) {
-                    writeConsoleLog('log','error - editing apiproxy default.xml');
+                    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'error - editing apiproxy default.xml');
                     return parallelCb(err);
                 }
 
@@ -249,42 +251,42 @@ Private.prototype.configureEdgemicroWithCreds = function configureEdgemicroWithC
 
     if (options.internaldeployed === false) {
         tasks.push(function(callback) {
-            writeConsoleLog('log','configuring edgemicro internal proxy');
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'configuring edgemicro internal proxy');
             that.configureEdgeMicroInternalProxy(options, callback);
         });
 
         tasks.push(function(callback) {
-            writeConsoleLog('log','deploying edgemicro internal proxy');
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'deploying edgemicro internal proxy');
             that.deployment.deployEdgeMicroInternalProxy(options, callback);
         });
     } else {
-        writeConsoleLog('log','Proxy edgemicro-internal is already deployed');
+        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'Proxy edgemicro-internal is already deployed');
     }
 
     if (options.deployed === false) {
         tasks.push(function(callback) {
-            writeConsoleLog('log','deploying ', that.name, ' app');
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'deploying ', that.name, ' app');
             that.deployment.deployWithLeanPayload(options, callback);
         });
     } else {
-        writeConsoleLog('log',that.name, ' is already deployed');
+        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},that.name, ' is already deployed');
     }
 
     tasks.push(function(callback) {
-	    writeConsoleLog('log','checking org for existing KVM');
+	    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'checking org for existing KVM');
         that.cert.checkPrivateCert(options, function(err /*, certs */ ) {
             if (err) {
-                writeConsoleLog('log','error checking for cert. Installing new cert.');
+                writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'error checking for cert. Installing new cert.');
                 that.cert.installCertWithPassword(options, callback);
             } else {
-                writeConsoleLog('log','KVM already exists in your org');
+                writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'KVM already exists in your org');
                 that.cert.retrievePublicKeyPrivate(callback);
             }
         });
     });
 
     tasks.push(function(callback) {
-        writeConsoleLog('log','generating keys');
+        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'generating keys');
         that.generateKeysWithPassword(options, callback);
     });
 
@@ -332,23 +334,17 @@ Private.prototype.configureEdgemicroWithCreds = function configureEdgemicroWithC
             }
 
             writeConsoleLog('log')
-            writeConsoleLog('log','saving configuration information to:', agentConfigPath);
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'saving configuration information to:', agentConfigPath);
             edgeconfig.save(agentConfig, agentConfigPath);
             writeConsoleLog('log')
 
             if (options.internaldeployed === false && options.deployed === false) {
-<<<<<<< HEAD
-		writeConsoleLog('log','vault info:\n', results[3]);
+		writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'vault info:\n', results[3]);
             } else if (options.internaldeployed === true && options.internaldeployed === false) {
-		writeConsoleLog('log','vault info:\n', results[1]);
-=======
-                console.log('vault info:\n', results[3]);
-            } else if (options.internaldeployed === true && options.internaldeployed === false) {
-                console.log('vault info:\n', results[1]);
->>>>>>> 137582169 mainly addressed here
+		writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'vault info:\n', results[1]);
             }
 
-            writeConsoleLog('log','edgemicro configuration complete!');
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'edgemicro configuration complete!');
             cb();
 
         });
@@ -423,27 +419,27 @@ Private.prototype.generateKeysWithPassword = function generateKeysWithPassword(o
 
                     if (res.statusCode >= 200 && res.statusCode <= 202) {
                         if (!res.body.region || !res.body.host) {
-                            cb(writeConsoleLog('error','invalid response from region api', regionUrl, res.text));
+                            cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'invalid response from region api', regionUrl, res.text));
                             return;
                         }
 
-                        writeConsoleLog('log','configuring host', res.body.host, 'for region', res.body.region);
+                        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'configuring host', res.body.host, 'for region', res.body.region);
                         const parsedRes = url.parse(res.body.host);
                         parsedUrl.host = parsedRes.host; // update to regional host
-                        writeConsoleLog('log')
-                        writeConsoleLog('info'that.config.edge_config.keySecretMessage);
-                        writeConsoleLog('info','  key:', key);
-                        writeConsoleLog('info','  secret:', secret);
-                        writeConsoleLog('log')
+                        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP})
+                        writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP}, that.config.edge_config.keySecretMessage);
+                        writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'  key:', key);
+                        writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'  secret:', secret);
+                        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP})
                         process.env.EDGEMICRO_KEY = key;
                         process.env.EDGEMICRO_SECRET = secret;
                         return cb(null, updatedUrl);
                     } else {
-                        cb(writeConsoleLog('error','error retrieving region for org', res.statusCode, res.text));
+                        cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error retrieving region for org', res.statusCode, res.text));
                     }
                 });
             } else {
-                cb(writeConsoleLog('error','error uploading credentials', res.statusCode, res.text));
+                cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error uploading credentials', res.statusCode, res.text));
             }
         });
     });
@@ -461,7 +457,7 @@ function translateError(err, res) {
 
 /*
 function optionError(message) {
-    writeConsoleLog('error',message);
+    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},message);
     this.help();
 }
 */

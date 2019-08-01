@@ -13,6 +13,8 @@ const configLocations = require('../../config/locations');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 edgeconfig.setConsoleLogger(writeConsoleLog);
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway token';
+
 const Token = function() {
 };
 
@@ -25,10 +27,10 @@ Token.prototype.decodeToken = function( options ) {
   const token = fs.readFileSync(path.resolve(options.file), 'utf8').trim();
   try{ 
     const decodedJWT = jwt.decode(token, {complete:true}); 
-    writeConsoleLog('log',decodedJWT);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},decodedJWT);
     return decodedJWT;
   }catch(err) {
-    writeConsoleLog('error',err);
+    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
   }
 }
 
@@ -69,13 +71,14 @@ Token.prototype.verifyToken = function(options, cb) {
         cb(err)
         return printError(err);
       }
-      writeConsoleLog('log',result);
+      writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},result);
       cb(null,result)
     });
+    //
   });
 
-
 }
+
 
 Token.prototype.getToken = function(options, cb) {
 
@@ -108,7 +111,7 @@ Token.prototype.getToken = function(options, cb) {
       if ( cb ) cb(err)
       return printError(err);
     }
-    writeConsoleLog('log',JSON.stringify(res.body, null, 2));
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},JSON.stringify(res.body, null, 2));
     if ( cb ) cb(null, res.body);
   });
 }
@@ -128,15 +131,15 @@ function getPublicKey(organization, environment, authUri, isPublicCloud, cb) {
 
 function printError(err) {
   if (err.response) {
-    writeConsoleLog('log',err.response.error);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},err.response.error);
   } else {
-    writeConsoleLog('log',err);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},err);
   }
 }
 
 /*
 function optionError(message) {
-  writeConsoleLog('error',message);
+  writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},message);
   this.help();
 }
 */

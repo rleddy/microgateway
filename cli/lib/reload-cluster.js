@@ -4,205 +4,28 @@ var cluster = require('cluster');
 var EventEmitter = require('events').EventEmitter;
 var cpuCount = require('os').cpus().length;
 const cache = require('microgateway-plugins').memored;
+const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
+
+const CONSOLE_LOG_TAG_COMP = 'microgateway reload cluster';
+
+const specialLists = require('./util/item-managers')
 
 const PURGE_INTERVAL = 60000;
 //
 const DEFAULT_PROCESS_CHECK_INTERVAL = 10000
-const DEFAULT_EXIT_COUNT_INTERVAL = 1000  // 5000
 const RAPID_REPLAY_INTERVAL_STOPPED_PROCESSES = 50
 const CALLBACK_TIMEOUT = 5000
 const MAX_CONNECT_FAIL_TIME = 200
 
-const MAX_PERIODS_EXIT_RATE = 5
 
 //
 var RLC = null;  // an instance if needed
-var gCurrentExitCount = 0  // available to the RLC, etc.
-
-class ExitCounter {
-
-  // --
-  constructor(theta,targetCB,interval) {
-    this.periods = []
-    this.exitsPerPeriod = 0
-    this.threshold = theta
-    this.checkRate = (interval !== undefined)? interval : DEFAULT_EXIT_COUNT_INTERVAL
-    gCurrentExitCount = 0
-
-    this.checkInterval = setInterval(() => {
-      var b = this.calcExitRate()
-      if ( targetCB ) {
-        targetCB(b)
-      }
-    },this.checkRate)
-  }
-
-  // --
-  add(count) {
-    this.periods.push(count)
-  }
-
-  //--
-  averageRate() {
-    var init = 0
-    if ( this.periods.length > MAX_PERIODS_EXIT_RATE) {
-      init = this.periods.shift()
-    }
-    var n = this.periods.length;
-    if ( n === 0 ) {
-      return 0
-    }
-    var sum = init
-    for ( var i = 0; i < n; i++ ) {
-      sum += this.periods[i]
-    }
-    var avg = sum/n
-
-    return avg
-  }
-
-  // --
-  calcExitRate() {
-    var prevExitCount = gCurrentExitCount;
-    gCurrentExitCount = 0;
-    this.add(prevExitCount)
-    if ( this.averageRate() > this.theta ) {
-      console.log("EXPERIENCING HIGH RATE OF PROCESS EXITS")
-      return(false)
-    }
-    return(true)
-  }
-
-  // --
-  stop() {
-    clearInterval(this.checkInterval)
-  }
-
-}
-
-var gExitCounter = null
+var gExitCounter = null;
 
 
-/*
-class RespawnIntervalManager {
-  //
-  constructor(opt) {
-    if ( opt ) {
-      this.respawnInterval = (opt.minRespawnInterval !== undefined) && (opt.minRespawnInterval >= 0) ? opt.minRespawnInterval : 1;  // default to 1 sec
-    } else {
-      this.minRespawnInterval = 1
-    }
-    this.lastSpawn = Date.now();
-  }
-  //
-  getIntervalForNextSpawn(now) {
-    var nextSpawn = Math.max(now, (this.lastSpawn + (this.respawnInterval * 1000)))
-    var intervalForNextSpawn = nextSpawn - now;
-    this.lastSpawn = nextSpawn;
-    return intervalForNextSpawn;
- }
-
- getNextSpawnFromNow() {
-   return(this.getIntervalForNextSpawn(Date.now()))
- }
-
-}
-*/
-
-var gRespawnIntervalManager = false; //new RespawnIntervalManager();
-
-/**
- * TimerList class
- * Maintain a list of timers identified by their timer object, returned but setTimout
- * Include convenience methods for adding, removing, and updating timers.
- */
-class TimerList {
-  //
-  constructor() {
-    this.items = []
-  }
-  //
-  clear() {
-    this.items.forEach((item) => {
-      clearTimeout(item);
-    })
-    this.items = []
-  }
-  //
-  add(id) {
-    if ( this.items ) {
-      this.items.push(id)
-    }
-  }
-  //
-  addTimeout(cb,tlapse) {
-    var to = setTimeout(cb,tlapse)
-    this.add(to)
-    return(to)
-  }
-
-  replaceTimeout(id,cb,tlapse) {
-    this.remove(id)
-    this.addTimeout(cb,tlapse)
-  }
-  //
-  remove(id) {
-    if ( (id !== undefined) && (id !== null) ) {
-      clearTimeout(id);
-      if ( this.items ) {
-        this.items.splice(this.items.indexOf(id),1)
-      }
-    }
-    return undefined
-  }
-  //
-}
-
-
-//  CallbackList class
-//  Add and remove callbacks. 
-//  One method for calling all callbacks
-//  This is useful in maintaining that should be called when a condition is met,
-//  but all execution pathways to the condition cannot gaurantee a stack variable 
-//  to be available for a single callback.
-class CallbackList {
-  constructor() {
-    this.items = []
-  }
-  //
-  clear() {
-    this.items = []
-  }
-  //
-  add(cb) {
-    if ( this.items && (typeof cb === 'function' ) ) {
-      if ( this.items.indexOf(cb) < 0 ) {
-        this.items.push(cb)
-      }
-    }
-  }
-  //
-  remove(cb) {
-    if ( typeof cb === 'function' ) {
-      this.items.splice(this.items.indexOf(cb),1)
-    }
-  }
-
-  runCallBacks() {
-    if ( this.items && (this.items.length > 0) ) {
-      this.items.forEach( cb => {
-        try {
-          cb()
-        } catch (e) {
-          console.log(e)
-        }
-      })  // when done eliminate
-      this.items = []
-    }
-  }
-}
-
-
+const ExitCounter = specialLists.ExitCounter
+const CallbackList = specialLists.CallbackList
+const TimerList = specialLists.TimerList
 
 
 class WorkerInfo {
@@ -225,7 +48,7 @@ class WorkerInfo {
         var onset = this.trackingStartTime
         var diff = Date.now() - onset
         //
-        //if ( diff > MAX_CONNECT_FAIL_TIME  )  console.log(`DISCONNECT TIMEOUT ${this.worker_key}`)
+        //if ( diff > MAX_CONNECT_FAIL_TIME  )  writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},`DISCONNECT TIMEOUT ${this.worker_key}`)
         //
         return ( diff > MAX_CONNECT_FAIL_TIME ) 
       }
@@ -299,7 +122,6 @@ function untrackTrackedProcesses() {  // clear out tracked processes and put the
 }
 
 
-
 // --clearOutStoppedProcesses--------------------------------------- 
 // --closePreconditions--------------------------------------- 
 
@@ -334,7 +156,7 @@ function cullProcesses() {
           w_info.request_disconnect = true
         } catch (e) {
           // might have never connected
-          //console.log(e)
+          //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},e)
         }
       } else if ( !(w.isDead()) && !(w.isConnected()) ) {   // The processes is no longer connected ... so kill it
         requestShutdownNow(w,w_info)
@@ -378,7 +200,6 @@ function clearOutStoppedProcesses(cb,threshold) {
 }
 
 
-
 function workersFullHouse(rlc) {
   var wantsmore = rlc.consonantProcesses();
   var clearoutCount = Object.keys(tClosers).length
@@ -387,23 +208,13 @@ function workersFullHouse(rlc) {
       workersFullHouse(rlc)
     },rlc.numWorker)
   } else {
-    if ( gRespawnIntervalManager && (wantsmore > 0) ) {
-      var intrval = gRespawnIntervalManager.getNextSpawnFromNow()
-      var iNextSpawn = gExtantTimers.addTimeout(() => { 
-        rlc.requestNewWorker();
-        gExtantTimers.remove(iNextSpawn)
-        workersFullHouse(rlc)
-      },intrval)
-    } else {
-      while ( wantsmore ) {
-        //console.log(wantsmore)
-        rlc.requestNewWorker()
-        wantsmore--;
-      }  
-    }
+    while ( wantsmore ) {
+      //console.log(wantsmore)
+      rlc.requestNewWorker()
+      wantsmore--;
+    }  
   }
 }
-
 
 
 // --healthCheck--------------------------------------- 
@@ -417,7 +228,6 @@ function healthCheck(rlc,special) {
     workersFullHouse(rlc)
   }
 }
-
 
 
 const readyCommand = 'ready';
@@ -436,7 +246,7 @@ class ClusterManager extends EventEmitter {
     this.reloading = false
     this.callbackTO = null  // callback timeout
     this.shuttingdown = false 
-    this.mayReload = true
+    this.mayReload = true  // if may reload is true, then reloads will not be prevented.
     //
     //this.readyEvent = opt.workerReadyWhen === 'started' ? 'online' : opt.workerReadyWhen === 'listening' ? 'listening' : 'message';
     // // //
@@ -444,8 +254,17 @@ class ClusterManager extends EventEmitter {
     this.setupClusterProcs(file)
     this.setUpClusterHandlers()
     // 
-    gExitCounter = new ExitCounter(2*this.numWorkers,(b) => {
-      this.mayReload = b;
+    var heuristicTheta = (Math.log2(this.numWorkers) + this.numWorkers/2)/2;
+    gExitCounter = new ExitCounter(heuristicTheta,(b) => {
+      if ( !(this.mayReload) && b ) {
+        // too many processes are dying to quickly, so log this that reloading is blocked until further notice. 
+        this.opt.logger.warn(`ClusterManager: RELOADING REENABLED AFTER too many child processes exiting`);
+      }
+      this.mayReload = b;  // b is boolean value 
+      if ( !b ) {
+        // too many processes are dying to quickly, so log this that reloading is blocked until further notice. 
+        this.opt.logger.warn(`ClusterManager: too many child processes exiting -- RELOADING DISABLED UNTIL FURTHER NOTICE`);
+      }
     });
     this.healthCheckInterval = setInterval(() => {
       healthCheck(this) 
@@ -461,7 +280,6 @@ class ClusterManager extends EventEmitter {
     this.opt.args = opt.args || [];
     this.opt.log = opt.log || {respawns: true};
     this.opt.logger = opt.logger;
-    //gRespawnIntervalManager = new RespawnIntervalManager({minRespawnInterval: opt.minRespawnInterval});
   }
 
   // --initializeCache--------------------------------------- 
@@ -494,29 +312,17 @@ class ClusterManager extends EventEmitter {
     // This exit event happens, whenever a worker exits.
 
     this.handleWorkerExit = (w) => {
-<<<<<<< HEAD
-      this.opt.logger.info(`handleWorkerExit ${w.id}`);
-=======
-      console.log(`handleWorkerExit ${w.id}`)
->>>>>>> 137582169 mainly addressed here
+      this.opt.logger.warn(`handleWorkerExit ${w.id} :: ${w.process ? w.process.pid  : '--'}`);
       this.workerExit(w)
     }
 
     this.handleWorkerDisconnect = (w) => {
-<<<<<<< HEAD
       this.opt.logger.info(`emitWorkerDisconnect ${w.id}`);
-=======
-      console.log(`emitWorkerDisconnect ${w.id}`)
->>>>>>> 137582169 mainly addressed here
       this.workerDisconnect(w)
     }
 
     this.handleWorkerListening = (w, adr) => {
-<<<<<<< HEAD
       this.opt.logger.info(`handleWorkerListening ${w.id}`)
-=======
-      console.log(`handleWorkerListening ${w.id}`)
->>>>>>> 137582169 mainly addressed here
       this.workerConnect(w,adr)
       if ( this.readyEvent === 'listening' ) {
         this.handleReadyEvent(w)
@@ -524,11 +330,7 @@ class ClusterManager extends EventEmitter {
     }
   
     this.handleWorkerOnline = (w) => {
-<<<<<<< HEAD
       this.opt.logger.info(`worker ${w.id} is online ...`)
-=======
-      console.log(`worker ${w.id} is online ...`)
->>>>>>> 137582169 mainly addressed here
       this.workerConnect(w)
       if ( this.readyEvent === 'online' ) {
         this.handleReadyEvent(w)
@@ -573,7 +375,7 @@ class ClusterManager extends EventEmitter {
   // --workerExit---------------------------------------
   // Cleanup tracked processes, which should attempt to put the worker into the closer list if it is still active
   workerExit(w) {
-    gCurrentExitCount++ // leaving it like this for now
+    gExitCounter.incr()
     cleanUpTrackedProcess()
     var w_info = tClosers[w.id] // the process should be here now if it is not undefined
     if ( w_info !== undefined ) {
@@ -745,7 +547,7 @@ class ClusterManager extends EventEmitter {
         this.emit('message', worker, message);
       });
       worker.on('error',(e) => {
-        console.log(e.message)
+        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},e.message)
       })
       //
       // When a worker exits remove the worker reference from workers array, which holds all the workers
@@ -766,7 +568,6 @@ class ClusterManager extends EventEmitter {
     cluster.removeListener('online', this.handleWorkerOnline);
     this.stopExtantTimers()
  }
-
 
 
   // ========================= Application methods ...  (public)

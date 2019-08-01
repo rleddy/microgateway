@@ -8,6 +8,8 @@ const upgradeauth = require('./lib/upgrade-edgeauth')();
 const rotatekey = require('./lib/rotate-key')();
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway cmd private';
+
 var prompt = require('cli-prompt');
 
 module.exports = function() {
@@ -233,7 +235,7 @@ function promptForPassword(options, cb) {
 function optionError(caller) {
     return(((obj) => { 
       return((message) => {
-        writeConsoleLog('error',message);
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},message);
         obj.help();  
       });
      })(caller))

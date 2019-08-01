@@ -16,7 +16,7 @@ const BUFFERSIZE    = 10000;
 const BATCHSIZE     = 500;
 const FLUSHINTERVAL = 5000;
 var defaultConfig ;
-
+const CONSOLE_LOG_TAG_COMP = 'microgateway configure';
 
 
 
@@ -36,7 +36,7 @@ module.exports = function () {
 
 Configure.prototype.configure = function configure(options, cb) {    
   if (!fs.existsSync(configLocations.getDefaultPath(options.configDir))) {
-    writeConsoleLog('error',"Missing %s, Please run 'edgemicro init'",configLocations.getDefaultPath())
+    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"Missing %s, Please run 'edgemicro init'",configLocations.getDefaultPath())
     return cb("Please call edgemicro init first")
   }
     
@@ -75,17 +75,17 @@ Configure.prototype.configure = function configure(options, cb) {
   const cache = configLocations.getCachePath(options.org, options.env);
   if (fs.existsSync(cache)) {
     fs.unlinkSync(cache);
-    //writeConsoleLog('log', 'deleted ' + cache);
+    //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'deleted ' + cache);
   }
 
   const targetPath = configLocations.getSourcePath(options.org, options.env);
   if (fs.existsSync(targetPath)) {
     fs.unlinkSync(targetPath);
-    //writeConsoleLog('log', 'deleted ' + targetPath);
+    //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'deleted ' + targetPath);
   }
 
   var configFileDirectory = options.configDir || configLocations.homeDir;
-  //writeConsoleLog('log', 'init config');
+  //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'init config');
   edgeconfig.init({
     source: configLocations.getDefaultPath(options.configDir),
     targetDir: configFileDirectory,
@@ -95,13 +95,13 @@ Configure.prototype.configure = function configure(options, cb) {
     options.deployed = false;
     deployAuth.checkDeployedProxies(options, (err, options) => {
       if (err) {
-        writeConsoleLog('error', err);
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP}, err);
         if ( cb ) { cb(err) } else process.exit(1);
         return;
       }
       configureEdgemicroWithCreds(options, (err) => {
         if (err) {
-          writeConsoleLog('error', err);
+          writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP}, err);
           if ( cb ) { cb(err) } else process.exit(1);
         }
         if ( cb ) { cb(err) } else process.exit(0);
@@ -125,17 +125,13 @@ function configureEdgemicroWithCreds(options, cb) {
   tasks.push(
     function (callback) {
       setTimeout(() => {
-<<<<<<< HEAD
-	writeConsoleLog('log', 'checking org for existing KVM');
-=======
-        console.log('checking org for existing KVM');
->>>>>>> 137582169 mainly addressed here
+	writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'checking org for existing KVM');
         cert.checkCertWithPassword(options, function (err/*, certs */) {
           if (err) {
-            writeConsoleLog('log', 'error checking for cert. Installing new cert.');
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'error checking for cert. Installing new cert.');
             cert.installCertWithPassword(options, callback);
           } else {
-            writeConsoleLog('log', 'KVM already exists in your org');
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'KVM already exists in your org');
             cert.retrievePublicKey(options, callback);
           }
         });
@@ -155,7 +151,7 @@ function configureEdgemicroWithCreds(options, cb) {
     }
     assert(targetFile, 'must have an assigned target file')
 
-    // writeConsoleLog('log', 'updating agent configuration');
+    // writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'updating agent configuration');
 
     if (err) {
       return cb(err)
@@ -195,35 +191,30 @@ function configureEdgemicroWithCreds(options, cb) {
       agentConfig['analytics']['flushInterval'] = FLUSHINTERVAL;
     }
 
-    writeConsoleLog('log');
-    writeConsoleLog('log', 'saving configuration information to:', agentConfigPath);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP});
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'saving configuration information to:', agentConfigPath);
     edgeconfig.save(agentConfig, agentConfigPath); // if it didn't throw, save succeeded
-    writeConsoleLog('log');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP});
 
-<<<<<<< HEAD
     if (options.deployed === true) {
-      writeConsoleLog('log', 'vault info:\n', results[0]);
-=======
-    if (options.deployed === true) {  
-      console.log('vault info:\n', results[0]);
->>>>>>> 137582169 mainly addressed here
+      writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'vault info:\n', results[0]);
     } else {
-      writeConsoleLog('log', 'vault info:\n', results[1]);
+      writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'vault info:\n', results[1]);
     }
-    writeConsoleLog('log');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP});
 
-    writeConsoleLog('log',keySecretMessage);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},keySecretMessage);
     const key = results[2] ? results[2].key : results[1].key;
     const secret = results[2] ? results[2].secret : results[1].secret;
     assert(key, 'must have a key');
     assert(secret, 'must have a secret');
-    writeConsoleLog('log', '  key:', key);
-    writeConsoleLog('log', '  secret:', secret);
-    writeConsoleLog('log');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, '  key:', key);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, '  secret:', secret);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP});
     process.env.EDGEMICRO_KEY = key;
     process.env.EDGEMICRO_SECRET = secret;
 
-    writeConsoleLog('log', 'edgemicro configuration complete!');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'edgemicro configuration complete!');
     setTimeout(cb, 50)
   });
 }
@@ -236,9 +227,9 @@ function addEnvVars(config) {
 /*
 function printError(err) {
   if (err.response) {
-    writeConsoleLog('log',err.response.error);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},err.response.error);
   } else {
-    writeConsoleLog('log',err);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},err);
   }
 }
 */

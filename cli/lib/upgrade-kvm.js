@@ -6,6 +6,8 @@ const util = require("util");
 const request = require("request");
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway upgrade kvm';
+
 function generateCredentialsObject(options) {
     if (options.token) {
         return {
@@ -36,18 +38,18 @@ UpgradeKVM.prototype.upgradekvm = function upgradekvm(options, cb) {
 
     var publicKeyURI = util.format('https://%s-%s.apigee.net/edgemicro-auth/publicKey', options.org, options.env);
 
-    writeConsoleLog('log',"Checking for certificate...");
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Checking for certificate...");
     request({
         uri: publicKeyURI,
         auth: generateCredentialsObject(options),
         method: "GET"
     }, function(err, res, body) {
         if (err) {
-            writeConsoleLog('error',err);
+            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
         } else {
-            writeConsoleLog('log',"Certificate found!");
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Certificate found!");
             pem.getPublicKey(body, function(err, publicKey) {
-                writeConsoleLog('log',publicKey.publicKey);
+                writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},publicKey.publicKey);
                 var updatekvmuri = util.format("%s/v1/organizations/%s/environments/%s/keyvaluemaps/%s",
                     options.baseuri, options.org, options.env, options.kvm);
                 var payload = {
@@ -78,9 +80,9 @@ UpgradeKVM.prototype.upgradekvm = function upgradekvm(options, cb) {
                         if ( cb ) { cb(err) } else process.exit(1);
                         return;
                     } if (res.statusCode !== 200) {
-			            writeConsoleLog('log',"error upgrading KVM: "+ res.statusCode);
+			            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"error upgrading KVM: "+ res.statusCode);
                     } else {
-                        writeConsoleLog('log',"KVM update complete");
+                        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"KVM update complete");
                         process.exit(0);
                     }
                 });

@@ -23,6 +23,8 @@ const pidpath = configLocations.getPIDFilePath();
 var portastic = require('portastic');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway cmd';
+
 const setup = function setup() {
     commander
         .version(require('../package.json').version);
@@ -97,7 +99,7 @@ const setup = function setup() {
         .action((options) => {
             options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
             init(options, (err, location) => {
-                writeConsoleLog('log',"config initialized to %s", location)
+                writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"config initialized to %s", location)
             })
         });
 
@@ -224,7 +226,7 @@ const setup = function setup() {
                     debug("downloading file...");
                     request.get(options.configUrl, function(error, response, body) {
                         if (error) {
-                            writeConsoleLog('error',"config file did not download: " + error);
+                            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file did not download: " + error);
                             process.exit(1);
                         }
                         try {
@@ -232,12 +234,12 @@ const setup = function setup() {
                             fs.writeFileSync(filePath, body, 'utf8');
                             run.start(options);
                         } catch (err) {
-                            writeConsoleLog('error',"config file could not be written: " + err);
+                            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file could not be written: " + err);
                             process.exit(1);
                         }
                     });
                 } else {
-                    writeConsoleLog('error',"url protocol not supported: " + parsedUrl.protocol);
+                    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"url protocol not supported: " + parsedUrl.protocol);
                     process.exit(1);
                 }
             } else {
@@ -288,7 +290,7 @@ const setup = function setup() {
                     debug("downloading file...");
                     request.get(options.configUrl, function(error, response, body) {
                         if (error) {
-                            writeConsoleLog('error',"config file did not download: " + error);
+                            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file did not download: " + error);
                             process.exit(1);
                         }
                         try {
@@ -296,7 +298,7 @@ const setup = function setup() {
                             fs.writeFileSync(filePath, body, 'utf8');
                             run.reload(options);
                         } catch (err) {
-                            writeConsoleLog('error',"config file could not be written: " + err);
+                            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file could not be written: " + err);
                             process.exit(1);
                         }
                     });
@@ -350,7 +352,7 @@ const setup = function setup() {
                     fs.appendFileSync(pidpath, process.pid + '|');
                     child.start();
                 } catch (piderr) {
-                    writeConsoleLog('error','failed to start microgateway: ' + piderr);
+                    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'failed to start microgateway: ' + piderr);
                     process.exit(1);
                 }
             } else {
@@ -362,10 +364,10 @@ const setup = function setup() {
                         });
                         fs.unlinkSync(pidpath);
                     } else {
-                        writeConsoleLog('log','pid file not found. please run this command from the folder where microgateway was started.')
+                        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'pid file not found. please run this command from the folder where microgateway was started.')
                     }
                 } catch (piderr) {
-                    writeConsoleLog('error','failed to stop microgateway: ' + piderr);
+                    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'failed to stop microgateway: ' + piderr);
                     process.exit(1);
                 }
             }
@@ -591,7 +593,7 @@ const setup = function setup() {
 function optionError(caller) {
     return(((obj) => { 
       return((message) => {
-        writeConsoleLog('error',message);
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},message);
         obj.help();  
       });
      })(caller))
@@ -616,7 +618,7 @@ function validateUrl(target) {
         url.parse(target, true);
         return true;
     } catch (err) {
-        writeConsoleLog('error',"Malformed URL: " + err);
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"Malformed URL: " + err);
         return false;
     }
 }

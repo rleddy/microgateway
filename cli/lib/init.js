@@ -4,6 +4,8 @@ const path = require('path');
 const configLocations = require('../../config/locations');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway init';
+
 module.exports =  function init(opts, cb) {
   if(typeof opts === 'function') {
     cb = opts;
@@ -17,7 +19,7 @@ module.exports =  function init(opts, cb) {
 
     fs.mkdir(destFileDir, () => {
       copyFile(srcFile, destFile, (err) => {
-        if ( err )  writeConsoleLog('log',"failed to init configpath file %s", err);
+        if ( err )  writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"failed to init configpath file %s", err);
         cb(err, destFile);
       }); 
     });

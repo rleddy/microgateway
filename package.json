@@ -40,6 +40,8 @@
     "xml2js": "^0.4.16"
   },
   "devDependencies": {
+    "eslint": "^6.1.0",
+    "eslint-config-google": "^0.13.0",
     "gulp": "^4.0.2",
     "gulp-shell": "^0.6.5",
     "gulp-sourcemaps": "^1.5.2",
@@ -53,14 +55,10 @@
     "run-sequence": "^1.1.0",
     "test-until": "^1.1.1"
   },
-  "eslintConfig": {
-    "env": {
-      "es6": true
-    }
-  },
   "scripts": {
     "start": "node app.js",
     "stop": "node stop.js",
+    "lint": "eslint ./cli ./lib app.js forever.js",
     "package": "node cli/package.js",
     "test": "mocha tests/*.*.integ.test.js --timeout 90000 && nyc mocha tests/*.*.unit.test.js"
   },

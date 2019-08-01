@@ -41,8 +41,6 @@ function installEMG() {
     rm -f installEMG.txt
   fi
 
-  echo $EDGEMICRO
-
   return $result
 }
 
@@ -298,8 +296,6 @@ testQuota() {
   local result=0
   local ret=0
 
-#set -x
-
   logInfo "Test Quota"
 
   apiKey=$(getDeveloperApiKey ${DEVELOPER_NAME} ${DEVELOPER_APP_NAME})
@@ -309,7 +305,6 @@ testQuota() {
   do
     curl -q -s http://localhost:8000/v1/${PROXY_NAME} -H "x-api-key: $apiKey" -D headers.txt > /dev/null 2>&1 ; ret=$?
     #echo $counter
-    echo '+'
     ((counter++))
   done
   result=$(grep HTTP headers.txt | cut -d ' ' -f2)
@@ -319,8 +314,6 @@ testQuota() {
        logError "Failed to test quota with code $result"
        ret=1
   fi
-
-#set +x
 
   return $ret
 

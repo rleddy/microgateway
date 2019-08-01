@@ -13,6 +13,8 @@ const configLocations = require('../../config/locations');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 edgeconfig.setConsoleLogger(writeConsoleLog);
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway key gen';
+
 const KeyGen = function() {
 
 };
@@ -40,12 +42,12 @@ KeyGen.prototype.revoke = function(options, cb) {
         }, function(err, res) {
             err = translateError(err, res);
             if (err) {
-				writeConsoleLog('log',err);
+				writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},err);
                 return cb(err);
             }
             if (res.statusCode >= 200 && res.statusCode <= 202) {
                 if (!res.body.region || !res.body.host) {
-                    cb(writeConsoleLog('error','invalid response from region api', regionUrl, res.text));
+                    cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'invalid response from region api', regionUrl, res.text));
                     return;
                 } else {
                     const credentialUrl = util.format('https://%s/edgemicro/%s/organization/%s/environment/%s', res.body.host, 'credential', options.org, options.env);
@@ -61,13 +63,13 @@ KeyGen.prototype.revoke = function(options, cb) {
                         }, function(er, re) {
                             er = translateError(er, re);
                             if (er) {
-                              writeConsoleLog('log',er);
+                              writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},er);
                                 return cb(er);
                             }
 							if (res.statusCode >= 200 && res.statusCode <= 202) {
-								writeConsoleLog('log',"key " + options.key + " revoked successfully");
+								writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"key " + options.key + " revoked successfully");
 							} else {
-								writeConsoleLog('log',"revoking key " + options.key + " failed with reason code " + res.StatusCode)
+								writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"revoking key " + options.key + " failed with reason code " + res.StatusCode)
 							}
                     });
 				}
@@ -80,19 +82,19 @@ KeyGen.prototype.generate = function generate(options, cb) {
   this.baseUri = config.edge_config.baseUri;
   this._generate(options, (err, result) => {
     if(err){
-      writeConsoleLog('error',"failed")
-      writeConsoleLog('error',err)
+      writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"failed")
+      writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err)
 
       cb(err);
     }
-    writeConsoleLog('info',config.edge_config.bootstrapMessage);
-    writeConsoleLog('info','  bootstrap:', result.bootstrap);
-    writeConsoleLog('log');
-    writeConsoleLog('info',config.edge_config.keySecretMessage);
-    writeConsoleLog('info','  key:', result.key);
-    writeConsoleLog('info','  secret:', result.secret);
-    writeConsoleLog('log');
-    writeConsoleLog('log','finished');
+    writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},config.edge_config.bootstrapMessage);
+    writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'  bootstrap:', result.bootstrap);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP});
+    writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},config.edge_config.keySecretMessage);
+    writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'  key:', result.key);
+    writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'  secret:', result.secret);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP});
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'finished');
     cb(err,result)
   });
 };
@@ -162,11 +164,11 @@ KeyGen.prototype._generate = function _generate(options, cb) {
           }
           if (res.statusCode >= 200 && res.statusCode <= 202) {
             if (!res.body.region || !res.body.host) {
-              cb(writeConsoleLog('error','invalid response from region api', regionUrl, res.text));
+              cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'invalid response from region api', regionUrl, res.text));
               return;
             }
 
-            writeConsoleLog('log','configuring host', res.body.host, 'for region', res.body.region);
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'configuring host', res.body.host, 'for region', res.body.region);
             const bootstrapUrl = util.format(baseUri, 'bootstrap', options.org, options.env);
             const parsedUrl = url.parse(bootstrapUrl);
             parsedUrl.host = res.body.host; // update to regional host
@@ -180,16 +182,15 @@ KeyGen.prototype._generate = function _generate(options, cb) {
             });
 
 
-
           } else {
 
-            cb(writeConsoleLog('error','error retrieving region for org', res.statusCode, res.text));
+            cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error retrieving region for org', res.statusCode, res.text));
 
           }
         });
       } else {
 
-        cb(writeConsoleLog('error','error uploading credentials', res.statusCode, res.text));
+        cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error uploading credentials', res.statusCode, res.text));
 
       }
     });
