@@ -460,6 +460,7 @@ class ClusterManager extends EventEmitter {
     this.opt.workerReadyWhen = opt.workerReadyWhen || 'listening';
     this.opt.args = opt.args || [];
     this.opt.log = opt.log || {respawns: true};
+    this.opt.logger = opt.logger;
     //gRespawnIntervalManager = new RespawnIntervalManager({minRespawnInterval: opt.minRespawnInterval});
   }
 
