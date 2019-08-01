@@ -5,6 +5,8 @@ const cert = require('./lib/cert')();
 const prompt = require('cli-prompt');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway cmd cert';
+
 const setup = function setup() {
 
   commander
@@ -113,7 +115,7 @@ const setup = function setup() {
 function optionError(caller) {
   return(((obj) => { 
     return((message) => {
-      writeConsoleLog('error',message);
+      writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},message);
       obj.help();  
     });
    })(caller))

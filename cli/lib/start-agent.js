@@ -5,6 +5,8 @@ const agentConfig = require('../../lib/agent-config');
 const assert = require('assert');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway start agent';
+
 var args;
 
 process.argv.forEach((val /*, index, array */) => {
@@ -16,7 +18,7 @@ assert(argsJson);
 
 agentConfig(argsJson, (e) => {
   if (e) {
-    writeConsoleLog('error','edge micro failed to start', e);
+    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'edge micro failed to start', e);
     return;
   }
   if (!cluster.isMaster) {
@@ -27,6 +29,6 @@ agentConfig(argsJson, (e) => {
       }
     });
   } else {
-    writeConsoleLog('log','edge micro started');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'edge micro started');
   }
 });

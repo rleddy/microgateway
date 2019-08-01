@@ -3,12 +3,28 @@
 'use strict';
 
 const assert = require('assert');
-const rewire = require('rewire')
-
-const reloadCluster = require('../cli/lib/reload-cluster.js');
+const fs = require('fs')
+const reloadCluster = require('./reload-cluster-old.js');
 
 const path = require('path');
 const { spawn } = require('child_process')
+
+
+
+class FauxLogger {
+	constructor() {
+	}
+	writeLogRecord(message) {
+
+	}
+	info(message) {
+		
+	}
+	warn(obj, msg) {
+		console.log(obj)  // this is how it is for
+    }
+}
+
 
 function whatProcesses(cb) {
 	//
@@ -29,7 +45,7 @@ function whatProcesses(cb) {
 	
 		lines = lines.split('\n');
 		var findLines = lines.filter(line => {
-			if ( line.indexOf('random_fails.js') > 0 ) {
+			if ( line.indexOf('gauged_fails.js') > 0 ) {
 				return(true)
 			}
 			return(false)
@@ -51,28 +67,7 @@ function whatProcesses(cb) {
 	
 }
 
-
-var mockLogger = {
-    info: function (obj, msg) {
-    },
-    warn: function (obj, msg) {
-		console.log(obj)  // this is how it is for
-    },
-    error: function (obj, msg) {
-    },
-    eventLog: function (obj, msg) {
-    },
-    consoleLog: function (level, ...data) {
-    },
-    stats: function (statsInfo, msg) {
-    },
-    setLevel: function (level) {
-    },
-    writeLogRecord: function(record,cb) {              
-    }
-  };
-
-
+var tries = 0
 
 function reloadRandom(cl) {
     var rT = Math.trunc(Math.round(Math.random()*10000))
@@ -83,7 +78,12 @@ function reloadRandom(cl) {
 			setTimeout(() => {
 				cl.reload((message) =>{
 					if ( message ) {
-						console.log("RELOAD MESSAGE: " + message)
+						console.log("RELOAD ZEZZAGE (find me): " + message)
+					} else if ( tries > 1 ) {
+						tries++
+						if ( tries > 3 ) {
+							process.exit(0)//
+						}
 					}
 					console.log("RELOADED: " + rT + " TRACKED: " + cl.countTracked() + " LEAVING: " + cl.countClosing() + " CLUSTER: " + cl.countCluster())
 					setImmediate(() => { reloadRandom(cl) }) 
@@ -96,13 +96,15 @@ function reloadRandom(cl) {
 
 function runWithRandomFailures() {
 	// ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-	var mgCluster = reloadCluster(__dirname + "/random_fails.js",{
-		logger : mockLogger
-	})
+	var mgCluster = reloadCluster( __dirname + "/gauged_fails.js",  { logger: new FauxLogger() } )
 	mgCluster.run()
 
 	reloadRandom(mgCluster)
 }
 
-
+fs.writeFileSync(__dirname + '/rateset.txt','5000','ascii')
+setTimeout(() => {
+	fs.writeFileSync(__dirname + '/rateset.txt','0','ascii')
+	tries = 1
+},30000)
 runWithRandomFailures()

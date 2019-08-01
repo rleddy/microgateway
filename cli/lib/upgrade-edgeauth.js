@@ -9,6 +9,8 @@ var deployAuth;
 const path = require('path');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway upgrade edgeauth';
+
 const UpgradeAuth = function() {
 
 }
@@ -50,7 +52,7 @@ UpgradeAuth.prototype.upgradeauth = function upgradeauth(options /*, cb */) {
 
     deployAuth.deployProxyWithPassword(options.mgmtUrl, 'na', opts, opts.directory, function(err /*, result */ ) {
         if (err) {
-            writeConsoleLog('log',err);
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},err);
         }
     });
 

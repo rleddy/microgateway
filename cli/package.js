@@ -14,9 +14,11 @@ const parseArgs = require('minimist');
 const yaml = require('js-yaml');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway package';
+
 const argv = parseArgs(process.argv.slice(2));
 if (!argv.version) {
-  writeConsoleLog('error','Usage:', process.argv[1], '--version <major.minor.patch>');
+  writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'Usage:', process.argv[1], '--version <major.minor.patch>');
   process.exit(1);
 }
 
@@ -32,13 +34,13 @@ async.parallel([
   function(cb) { available('tsc', cb); }
 ], function(err /*, results*/ ) {
   if (err) {
-    writeConsoleLog('error','gulp/tsc not found in path (try "npm i -g gulp typescript")');
+    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'gulp/tsc not found in path (try "npm i -g gulp typescript")');
     process.exit(1);
   }
 });
 
 process.chdir(buildDir);
-writeConsoleLog('info','building package in', buildDir);
+writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'building package in', buildDir);
 
 const topLevelFiles = [
   'build.yaml',
@@ -106,17 +108,17 @@ async.series(tasks, function(err  /*, results */) {
 });
 
 function git_clone(repo, branch, callback) {
-  writeConsoleLog('log','git clone', repo);
+  writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'git clone', repo);
   exec(
     'git clone ' + (branch ? '-b ' + branch + ' ': '') + '-q ' + repo,
     function(error, stdout, stderr) {
-      // writeConsoleLog('info',stdout);
-      writeConsoleLog('error',stderr);
+      // writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},stdout);
+      writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},stderr);
       if (error) {
-        writeConsoleLog('error','error cloning repo', repo, error);
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error cloning repo', repo, error);
         callback(error);
       } else {
-        writeConsoleLog('info','cloned', repo);
+        writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'cloned', repo);
         callback();
       }
     }
@@ -124,18 +126,18 @@ function git_clone(repo, branch, callback) {
 }
 
 function npm_install(dir, production, callback) {
-  writeConsoleLog('log','npm install', dir, production ? '(production)' : '(development)');
+  writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'npm install', dir, production ? '(production)' : '(development)');
   exec(
     'npm install ' + (production ? '--production' : ''),
     {cwd: dir},
     function(error, stdout, stderr) {
-      // writeConsoleLog('info',stdout);
-      writeConsoleLog('error',stderr);
+      // writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},stdout);
+      writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},stderr);
       if (error) {
-        writeConsoleLog('error','error running npm install in dir', dir, error);
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error running npm install in dir', dir, error);
         callback(error);
       } else {
-        writeConsoleLog('info','installed modules in', dir);
+        writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'installed modules in', dir);
         callback();
       }
     }
@@ -143,7 +145,7 @@ function npm_install(dir, production, callback) {
 }
 
 function build_properties(repo, callback) {
-  writeConsoleLog('log','creating build properties in', repo);
+  writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'creating build properties in', repo);
   const properties = {};
   properties.version = argv.version;
   properties.date = (new Date()).toISOString();
@@ -151,9 +153,9 @@ function build_properties(repo, callback) {
     'git show HEAD|grep commit|cut -f2 -d" "',
     {cwd: repo},
     function(error, stdout, stderr) {
-      writeConsoleLog('error',stderr);
+      writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},stderr);
       if (error) {
-        writeConsoleLog('error','error running "git show HEAD" in repo', repo, error);
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error running "git show HEAD" in repo', repo, error);
         callback(error);
       } else {
         properties.head = stdout.trim();
@@ -167,7 +169,7 @@ function build_properties(repo, callback) {
 
 function update_version(repo, callback) {
   const pkgJSON = path.join(repo, 'package.json');
-  writeConsoleLog('log','updating version in', pkgJSON);
+  writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'updating version in', pkgJSON);
   const pkg = JSON.parse(fs.readFileSync(pkgJSON));
   pkg.version = argv.version;
   fs.writeFileSync(pkgJSON, JSON.stringify(pkg, null, 2));
@@ -176,14 +178,14 @@ function update_version(repo, callback) {
 
 function git_tag(repo, callback) {
   const tag = 'v' + argv.version;
-  writeConsoleLog('log','tagging repo', repo, 'with version', tag);
+  writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'tagging repo', repo, 'with version', tag);
   exec(
     'git tag ' + tag,
     {cwd: repo},
     function(error, stdout, stderr) {
-      writeConsoleLog('error',stderr);
+      writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},stderr);
       if (error) {
-        writeConsoleLog('error','error running "git tag" in repo', repo, error);
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error running "git tag" in repo', repo, error);
         callback(error);
       } else {
         callback();
@@ -193,18 +195,18 @@ function git_tag(repo, callback) {
 }
 
 function gulp(dir, target, callback) {
-  writeConsoleLog('log','gulp', target);
+  writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'gulp', target);
   exec(
     'gulp ' + target,
     {cwd: dir},
     function(error, stdout, stderr) {
-      // writeConsoleLog('info',stdout);
-      writeConsoleLog('error',stderr);
+      // writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},stdout);
+      writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},stderr);
       if (error) {
-        writeConsoleLog('error','error running gulp in dir', dir, error);
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error running gulp in dir', dir, error);
         callback(error);
       } else {
-        writeConsoleLog('info','compiled sources in', dir);
+        writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'compiled sources in', dir);
         callback();
       }
     }
@@ -214,7 +216,7 @@ function gulp(dir, target, callback) {
 function zip(zipfile, dir, dirs, excludes, callback) {
   const command = '/usr/bin/zip';
   const args = ['-q', '--symlinks', '-r', zipfile].concat(dirs, '-x', excludes);
-  writeConsoleLog('log',dir, command, args.join(' '));
+  writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},dir, command, args.join(' '));
   const zip = spawn(command, args, {
     cwd: dir,
     stdio: 'inherit'
@@ -222,10 +224,10 @@ function zip(zipfile, dir, dirs, excludes, callback) {
 
   zip.on('exit', function(error) {
     if (error) {
-      writeConsoleLog('error','error creating zip', error);
+      writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error creating zip', error);
       callback(error);
     } else {
-      writeConsoleLog('info','built', path.join(dir, zipfile));
+      writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},'built', path.join(dir, zipfile));
       callback();
     }
   });
@@ -234,7 +236,7 @@ function zip(zipfile, dir, dirs, excludes, callback) {
 function available(cmd, callback) {
   exec('/usr/bin/which ' + cmd,
     function(error, stdout /*, stderr */) {
-      // writeConsoleLog('info',error, stdout);
+      // writeConsoleLog('info',{component: CONSOLE_LOG_TAG_COMP},error, stdout);
       callback(error, stdout);
     }
   );

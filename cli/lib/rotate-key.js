@@ -8,6 +8,8 @@ const request = require("request");
 const async = require('async');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway rotate key';
+
 function createCert(cb) {
 
     const options = {
@@ -93,9 +95,9 @@ function updateNonCPSKVM(options, serviceKey, newCertificate, newPublicKey, oldP
        json: payload
     }, function(err, res /*, body */) {
        if (err || res.statusCode > 299) {
-           writeConsoleLog('error',err);
+           writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
        } else {
-           writeConsoleLog('log',"Key Rotation successfully completed!");
+           writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Key Rotation successfully completed!");
        }
     });	
 }
@@ -262,10 +264,10 @@ function updateCPSKVM(options, serviceKey, newCertificate, newPublicKey, oldPubl
 		}												
 	], function (err /*, results */) {
 		if (err) {
-			writeConsoleLog('error',err);
+			writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
 			process.exit(1);
 		} else {
-			writeConsoleLog('log',"Key Rotation successfully completed!");
+			writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Key Rotation successfully completed!");
 		}
     });
 }
@@ -289,7 +291,7 @@ RotateKey.prototype.rotatekey = function rotatekey(options /*, cb */) {
     	function(cb) {
 		    var privateKeyURI = util.format("%s/v1/organizations/%s/environments/%s/keyvaluemaps/%s/entries/private_key",
 		        options.baseuri, options.org, options.env, options.kvm);
-		    writeConsoleLog('log',"Checking if private key exists in the KVM...");
+		    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Checking if private key exists in the KVM...");
 		    request({
 		        uri: privateKeyURI,
 		        auth: generateCredentialsObject(options),
@@ -300,7 +302,7 @@ RotateKey.prototype.rotatekey = function rotatekey(options /*, cb */) {
 		    }); 		
     	},
 		function(cb) {
-			writeConsoleLog('log',"Checking for certificate...");
+			writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Checking for certificate...");
             var publicKeyURI = util.format("https://%s-%s.apigee.net/edgemicro-auth/publicKey",
                 options.org, options.env);			
             request({
@@ -314,11 +316,11 @@ RotateKey.prototype.rotatekey = function rotatekey(options /*, cb */) {
 		}
     ], function(err, results){
     	if (err) {
-			writeConsoleLog('error',err);
+			writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
 			process.exit(1);
     	} else {
     		var oldCertificate = results[1];
-			writeConsoleLog('log',"Found Certificate");
+			writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Found Certificate");
 			//debug("Old Certificate: \n" + oldCertificate);
 			async.series([
 				function(cb) {
@@ -329,7 +331,7 @@ RotateKey.prototype.rotatekey = function rotatekey(options /*, cb */) {
 					
 				}, 
 				function(cb) {
-					writeConsoleLog('log',"Generating New key/cert pair...");
+					writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Generating New key/cert pair...");
 					createCert(function(e, newkeys) {
 						if (e) cb(e);
 						else cb(null, newkeys);
@@ -337,14 +339,14 @@ RotateKey.prototype.rotatekey = function rotatekey(options /*, cb */) {
 				}
 			], function(e, res){
 				if (err) {
-					writeConsoleLog('error',e);
+					writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},e);
 					process.exit(1);
 				} else {
-					writeConsoleLog('log',"Extract new public key");
+					writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Extract new public key");
 					var newCertificate = res[1].certificate;
 					pem.getPublicKey(newCertificate, function(ee, newkey) {
 						if (ee) {
-							writeConsoleLog('error',ee);
+							writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},ee);
 							process.exit(1);
 						} else {
 							debug("Checking for CPS...");

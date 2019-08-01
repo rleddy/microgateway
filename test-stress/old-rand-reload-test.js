@@ -5,10 +5,26 @@
 const assert = require('assert');
 const rewire = require('rewire')
 
-const reloadCluster = require('../cli/lib/reload-cluster.js');
+const reloadCluster = require('./reload-cluster-old.js');
 
 const path = require('path');
 const { spawn } = require('child_process')
+
+
+class FauxLogger {
+	constructor() {
+	}
+	writeLogRecord(message) {
+
+	}
+	info(message) {
+		
+	}
+	warn(obj, msg) {
+		console.log(obj)  // this is how it is for
+    }
+}
+
 
 function whatProcesses(cb) {
 	//
@@ -52,28 +68,6 @@ function whatProcesses(cb) {
 }
 
 
-var mockLogger = {
-    info: function (obj, msg) {
-    },
-    warn: function (obj, msg) {
-		console.log(obj)  // this is how it is for
-    },
-    error: function (obj, msg) {
-    },
-    eventLog: function (obj, msg) {
-    },
-    consoleLog: function (level, ...data) {
-    },
-    stats: function (statsInfo, msg) {
-    },
-    setLevel: function (level) {
-    },
-    writeLogRecord: function(record,cb) {              
-    }
-  };
-
-
-
 function reloadRandom(cl) {
     var rT = Math.trunc(Math.round(Math.random()*10000))
 	rT = parseInt('' + rT)
@@ -96,9 +90,7 @@ function reloadRandom(cl) {
 
 function runWithRandomFailures() {
 	// ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-	var mgCluster = reloadCluster(__dirname + "/random_fails.js",{
-		logger : mockLogger
-	})
+	var mgCluster = reloadCluster( __dirname + "/random_fails.js",  { logger: new FauxLogger() } )
 	mgCluster.run()
 
 	reloadRandom(mgCluster)

@@ -13,6 +13,8 @@ const assert = require('assert')
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 edgeconfig.setConsoleLogger(writeConsoleLog);
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway cert';
+
 const Cert = function() {
 };
 
@@ -37,9 +39,9 @@ Cert.prototype.installCert = function(options, cb) {
   cert(config).installCertWithPassword(options, (err, res) => {
     if (err) {
       if ( cb ) cb(err);
-      return writeConsoleLog('error',  err, 'failed to update cert');
+      return writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},  err, 'failed to update cert');
     }
-    writeConsoleLog('log','installed cert');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'installed cert');
     if ( cb ) cb(null,res);
     if ( !cb ) process.exit(0);
   });
@@ -69,9 +71,9 @@ Cert.prototype.checkCert = function(options, cb) {
       if ( cb ) {
         return cb(err);
       }
-      return writeConsoleLog('error',  err, 'failed to update cert')
+      return writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},  err, 'failed to update cert')
     }
-    writeConsoleLog('log','checked cert successfully');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'checked cert successfully');
     if ( cb ) cb(null,res);
     if ( !cb ) process.exit(0);
   });
@@ -87,12 +89,11 @@ Cert.prototype.deleteCert = function(options,cb) {
   assert(options.password || options.token,"password is required")
 
 
-
   const config = edgeconfig.load({ source: configLocations.getSourcePath(options.org, options.env) });
 
   cert(config).deleteCertWithPassword(options, function(err, msg) {
-    if ( err ) writeConsoleLog('error',  err);
-    if ( msg ) writeConsoleLog('log',msg);
+    if ( err ) writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},  err);
+    if ( msg ) writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},msg);
     if ( cb ) cb(err,msg);
     if ( !cb ) process.exit(0);
   })
@@ -117,10 +118,10 @@ Cert.prototype.retrievePublicKey = function(options,cb) {
   cert(config).retrievePublicKey(options, (err, certificate) => {
     if (err) {
       if ( cb ) cb(err);
-      return writeConsoleLog('error',  err, 'failed to retrieve public key')
+      return writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},  err, 'failed to retrieve public key')
     }
-    writeConsoleLog('log', 'succeeded');
-    writeConsoleLog('log', certificate);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, 'succeeded');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, certificate);
     if ( cb ) cb(null,certificate);
     if ( !cb ) process.exit(0);
   })
@@ -135,24 +136,24 @@ Cert.prototype.retrievePublicKeyPrivate = function(options) {
   const config = edgeconfig.load({ source: configLocations.getSourcePath(options.org, options.env) });
   cert(config).retrievePublicKeyPrivate((err, certificate) => {
     if (err) {
-      return writeConsoleLog('error',  err, 'failed to retrieve public key')
+      return writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},  err, 'failed to retrieve public key')
     }
-    writeConsoleLog('log','succeeded');
-    writeConsoleLog('log', certificate);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'succeeded');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP}, certificate);
   })
 }
 
 /*
 function optionError(message) {
-  writeConsoleLog('error',message);
+  writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},message);
   this.help();
 }
 
 function printError(err) {
   if (err.response) {
-    writeConsoleLog('log',err.response.error);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},err.response.error);
   } else {
-    writeConsoleLog('log',err);
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},err);
   }
 }
 */

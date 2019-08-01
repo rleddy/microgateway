@@ -16,8 +16,10 @@ const debug = require('debug')('edgemicro-auth')
 var exec = require('child_process').exec;
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway deploy auth';
+
 var run = function(cmd, cb) {
-    //writeConsoleLog('log','run %s',cmd)
+    //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'run %s',cmd)
     // var child = 
     exec(cmd, {
         maxBuffer: 1024 * 500
@@ -82,14 +84,14 @@ Deployment.prototype.deployWithLeanPayload = function deployWithLeanPayload(opti
 
     // copy bin folder into tmp
     tasks.push(function(cb) {
-        //writeConsoleLog('log','copy auth app into tmp dir');
+        //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'copy auth app into tmp dir');
         cpr(path.resolve(__dirname, '..', '..', 'node_modules', 'microgateway-edgeauth'), tmpDir.name, cb);
     });
 
 
     // copy bin folder into tmp
     tasks.push(function(cb) {
-        //writeConsoleLog('log','copy config into tmp dir');
+        //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'copy config into tmp dir');
         cpr(path.resolve(__dirname, '..', '..', 'config'), tmpDir.name + '/config', cb);
     });
 
@@ -128,7 +130,7 @@ Deployment.prototype.deployWithLeanPayload = function deployWithLeanPayload(opti
 
 // checks for previously deployed edgemicro internal proxies
 Deployment.prototype.checkDeployedInternalProxies = function checkDeployedInternalProxies(options, cb) {
-    //writeConsoleLog('log','checking for previously deployed proxies')
+    //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'checking for previously deployed proxies')
     const opts = {
         organization: options.org,
         api: 'edgemicro-internal',
@@ -160,7 +162,7 @@ Deployment.prototype.checkDeployedInternalProxies = function checkDeployedIntern
 
 // checks for previously deployed edgemicro proxies
 Deployment.prototype.checkDeployedProxies = function checkDeployedProxies(options, cb) {
-    //writeConsoleLog('log','checking for previously deployed proxies')
+    //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'checking for previously deployed proxies')
     const opts = {
         organization: options.org,
         api: 'edgemicro-auth',
@@ -265,7 +267,7 @@ Deployment.prototype.deployProxyWithPassword = function deployProxyWithPassword(
     if (options.runtimeUrl) {
       setEdgeMicroInternalEndpoint(dir + "/apiproxy/policies/Authenticate-Call.xml", options.runtimeUrl);
     } 
-    writeConsoleLog('log','Give me a minute or two... this can take a while...');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'Give me a minute or two... this can take a while...');
     apigeetool.deployProxy(opts, function(err) {
         if (err) {
             if (err.code === 'ECONNRESET' && err.message === 'socket hang up') {
@@ -276,17 +278,17 @@ Deployment.prototype.deployProxyWithPassword = function deployProxyWithPassword(
 
             return callback(err);
         } else {
-            writeConsoleLog('log','App %s deployed.', options.proxyName);
+            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'App %s deployed.', options.proxyName);
             callback(null, options.runtimeUrl ? authUri + '/publicKey' : util.format(authUri + '/publicKey', options.org, options.env));
         }
 
-        //writeConsoleLog('log','App %s added to your org. Now adding resources.', options.proxyName);
+        //writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'App %s added to your org. Now adding resources.', options.proxyName);
         /*    opts.password = options.password; // override a apigeetool side-effect bug
             installJavaCallout(managementUri, opts, function(err) {
               if (err) {
                 return callback(err);
               }
-              writeConsoleLog('log','App %s deployed.', options.proxyName);
+              writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'App %s deployed.', options.proxyName);
               callback(null, options.runtimeUrl ? authUri + '/publicKey' : util.format(authUri + '/publicKey', options.org, options.env));
 
             });*/

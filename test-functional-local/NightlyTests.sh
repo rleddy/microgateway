@@ -3,6 +3,8 @@
 #
 # Author: dkoroth@google.com
 #
+#Uncomment below to enabled detailed logging on tests
+#set -x
 
 source ./testhelper.sh
 source ./testEMG.sh

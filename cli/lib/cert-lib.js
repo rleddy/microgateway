@@ -12,6 +12,8 @@ const debug = require('debug')('cert')
 //const prompt = require('cli-prompt');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
+const CONSOLE_LOG_TAG_COMP = 'microgateway cert lib';
+
 const ERR_STORE_EXISTS = 'com.apigee.secure-store.storekey.already.exists';
 const ERR_STORE_MISSING = 'com.apigee.secure-store.securestore_does_not_exist';
 //const ERR_STORE_ITEM_MISSING = 'com.apigee.secure-store.storeitem_does_not_exist';
@@ -94,7 +96,7 @@ CertLogic.prototype.installPrivateCert = function(options, callback) {
             if (callback) {
                 return callback(err);
             } else {
-                return writeConsoleLog('log',err, err.stack);
+                return writeConsoleLog('log', {component: CONSOLE_LOG_TAG_COMP},err, err.stack);
             }
         }
 
@@ -112,9 +114,9 @@ CertLogic.prototype.installPrivateCert = function(options, callback) {
                         deleteVault(generateCredentialsObject(options), managementUri, options.org, options.env, vaultName, cb);
                     },
                     function(cb) {
-                        writeConsoleLog('log','creating KVM');
-                        writeConsoleLog('log','adding private_key');
-                        writeConsoleLog('log','adding public_key');
+                        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'creating KVM');
+                        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'adding private_key');
+                        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'adding public_key');
                         var entries = [{
                                 'name': 'private_key',
                                 'value': privateKey
@@ -246,15 +248,15 @@ CertLogic.prototype.generateKeysWithPassword = function generateKeysWithPassword
                     if (res.statusCode >= 200 && res.statusCode <= 202) {
                         if (!res.body.region || !res.body.host) {
                             if (cb) {
-                                cb(writeConsoleLog('error','invalid response from region api', regionUrl, res.text));
+                                cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'invalid response from region api', regionUrl, res.text));
                             } else {
-                                writeConsoleLog('error','invalid response from region api', regionUrl, res.text);
+                                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'invalid response from region api', regionUrl, res.text);
                             }
 
                             return;
                         }
 
-                        writeConsoleLog('log','configuring host', res.body.host, 'for region', res.body.region);
+                        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'configuring host', res.body.host, 'for region', res.body.region);
                         var bootstrapUrl = util.format(managementUri, 'bootstrap', options.org, options.env);
                         var parsedUrl = url.parse(bootstrapUrl);
                         parsedUrl.host = res.body.host; // update to regional host
@@ -268,11 +270,11 @@ CertLogic.prototype.generateKeysWithPassword = function generateKeysWithPassword
 
 
                     } else {
-                        cb(writeConsoleLog('error','error retrieving region for org', res.statusCode, res.text));
+                        cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error retrieving region for org', res.statusCode, res.text));
                     }
                 });
             } else {
-                cb(writeConsoleLog('error','error uploading credentials', res.statusCode, res.text));
+                cb(writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'error uploading credentials', res.statusCode, res.text));
             }
         });
     });
@@ -312,7 +314,7 @@ function createCert(cb) {
 }
 
 function deleteVault(credentials, managementUri, organization, environment, vaultName, cb) {
-    writeConsoleLog('log','deleting KVM');
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'deleting KVM');
 
     var uri = util.format('%s/v1/organizations/%s/environments/%s/keyvaluemaps/%s', managementUri, organization, environment, vaultName);
 
@@ -328,7 +330,6 @@ function deleteVault(credentials, managementUri, organization, environment, vaul
 
         cb(err, res);
     });
-
 
 
 }
@@ -430,9 +431,9 @@ function uploadCert(options, managementUri, vaultName, privateKey, publicKey, ca
                     deleteVault(generateCredentialsObject(options), managementUri, options.org, options.env, vaultName, cb);
                 },
                 function(cb) {
-                    writeConsoleLog('log','creating KVM');
-                    writeConsoleLog('log','adding private_key');
-                    writeConsoleLog('log','adding public_key');
+                    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'creating KVM');
+                    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'adding private_key');
+                    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'adding public_key');
                     var entries = [{
                             'name': 'private_key',
                             'value': privateKey
