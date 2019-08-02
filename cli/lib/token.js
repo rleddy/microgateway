@@ -72,8 +72,8 @@ Token.prototype.verifyToken = function(options, cb) {
     });
   });
 
-
 }
+
 
 Token.prototype.getToken = function(options, cb) {
 
