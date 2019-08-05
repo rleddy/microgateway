@@ -291,7 +291,7 @@ Gateway.prototype.reload = (options) => {
     socket.on('error', (error) => {
         if (error) {
             if (error.code === 'ENOENT') {
-		writeConsoleLog('error','edgemicro is not running.');
+		        writeConsoleLog('error','edgemicro is not running.');
             }
         }
     });
@@ -317,7 +317,7 @@ Gateway.prototype.stop = ( /*options */ ) => {
     socket.on('error', (error) => {
         if (error) {
             if (error.code === 'ENOENT') {
-		writeConsoleLog('error','edgemicro is not running.');
+		        writeConsoleLog('error','edgemicro is not running.');
             }
         }
     });
@@ -338,8 +338,8 @@ Gateway.prototype.status = ( /* options */ ) => {
     socket.on('error', (error)=> {
       if (error) {
         if (error.code === 'ENOENT') {
-	  writeConsoleLog('error','edgemicro is not running.');
-          process.exit(1);
+            writeConsoleLog('error','edgemicro is not running.');
+            process.exit(1);
         }
       }
     });

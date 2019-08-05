@@ -271,7 +271,7 @@ Private.prototype.configureEdgemicroWithCreds = function configureEdgemicroWithC
     }
 
     tasks.push(function(callback) {
-	writeConsoleLog('log','checking org for existing KVM');
+	    writeConsoleLog('log','checking org for existing KVM');
         that.cert.checkPrivateCert(options, function(err /*, certs */ ) {
             if (err) {
                 writeConsoleLog('log','error checking for cert. Installing new cert.');
@@ -337,9 +337,15 @@ Private.prototype.configureEdgemicroWithCreds = function configureEdgemicroWithC
             writeConsoleLog('log')
 
             if (options.internaldeployed === false && options.deployed === false) {
+<<<<<<< HEAD
 		writeConsoleLog('log','vault info:\n', results[3]);
             } else if (options.internaldeployed === true && options.internaldeployed === false) {
 		writeConsoleLog('log','vault info:\n', results[1]);
+=======
+                console.log('vault info:\n', results[3]);
+            } else if (options.internaldeployed === true && options.internaldeployed === false) {
+                console.log('vault info:\n', results[1]);
+>>>>>>> 137582169 mainly addressed here
             }
 
             writeConsoleLog('log','edgemicro configuration complete!');

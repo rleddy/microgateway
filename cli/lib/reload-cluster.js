@@ -494,17 +494,29 @@ class ClusterManager extends EventEmitter {
     // This exit event happens, whenever a worker exits.
 
     this.handleWorkerExit = (w) => {
+<<<<<<< HEAD
       this.opt.logger.info(`handleWorkerExit ${w.id}`);
+=======
+      console.log(`handleWorkerExit ${w.id}`)
+>>>>>>> 137582169 mainly addressed here
       this.workerExit(w)
     }
 
     this.handleWorkerDisconnect = (w) => {
+<<<<<<< HEAD
       this.opt.logger.info(`emitWorkerDisconnect ${w.id}`);
+=======
+      console.log(`emitWorkerDisconnect ${w.id}`)
+>>>>>>> 137582169 mainly addressed here
       this.workerDisconnect(w)
     }
 
     this.handleWorkerListening = (w, adr) => {
+<<<<<<< HEAD
       this.opt.logger.info(`handleWorkerListening ${w.id}`)
+=======
+      console.log(`handleWorkerListening ${w.id}`)
+>>>>>>> 137582169 mainly addressed here
       this.workerConnect(w,adr)
       if ( this.readyEvent === 'listening' ) {
         this.handleReadyEvent(w)
@@ -512,7 +524,11 @@ class ClusterManager extends EventEmitter {
     }
   
     this.handleWorkerOnline = (w) => {
+<<<<<<< HEAD
       this.opt.logger.info(`worker ${w.id} is online ...`)
+=======
+      console.log(`worker ${w.id} is online ...`)
+>>>>>>> 137582169 mainly addressed here
       this.workerConnect(w)
       if ( this.readyEvent === 'online' ) {
         this.handleReadyEvent(w)
