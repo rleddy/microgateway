@@ -80,7 +80,7 @@ UpgradeKVM.prototype.upgradekvm = function upgradekvm(options, cb) {
                         if ( cb ) { cb(err) } else process.exit(1);
                         return;
                     } if (res.statusCode !== 200) {
-			            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"error upgrading KVM: "+ res.statusCode);
+			            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"error upgrading KVM: " + res.statusCode);
                     } else {
                         writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"KVM update complete");
                         process.exit(0);

@@ -128,8 +128,8 @@ verifyEMG() {
      return $result
   fi 
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f4)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f4)
+  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
+  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -163,8 +163,8 @@ startEMG() {
 
   logInfo "Start EMG"
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f4)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f4)
+  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
+  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -217,8 +217,8 @@ configAndReloadEMG() {
   node setYamlVars ${EMG_CONFIG_FILE} 'edgemicro.config_change_poll_interval' 10 'oauth.allowNoAuthorization' false 'edgemicro.plugins.sequence[1]' 'quota' > tmp_emg_file.yaml
   cp tmp_emg_file.yaml ${EMG_CONFIG_FILE}
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f4)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f4)
+  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
+  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -248,8 +248,8 @@ setProductNameFilter() {
   node setYamlVars ${EMG_CONFIG_FILE} 'edge_config.products' "https://${MOCHA_ORG}-${MOCHA_ENV}.apigee.net/edgemicro-auth/products?productnamefilter=.*$PRODUCT_NAME.*" > tmp_emg_file.yaml
   cp tmp_emg_file.yaml ${EMG_CONFIG_FILE}
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f4)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f4)
+  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
+  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -413,8 +413,8 @@ setInvalidProductNameFilter() {
 
   logInfo "Set Invalid Product Name Filter"
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f4)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f4)
+  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
+  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -469,8 +469,8 @@ resetInvalidProductNameFilter() {
   node setYamlVars ${EMG_CONFIG_FILE} 'edge_config.products' "https://${MOCHA_ORG}-${MOCHA_ENV}.apigee.net/edgemicro-auth/products" > tmp_emg_file.yaml
   cp tmp_emg_file.yaml ${EMG_CONFIG_FILE}
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f4)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f4)
+  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
+  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
