@@ -25,10 +25,18 @@ proxyTargetUrl="http://mocktarget.apigee.net/json"
 EMG_CONFIG_DIR="$HOME/.edgemicro"
 EMG_CONFIG_FILE="$HOME/.edgemicro/$MOCHA_ORG-$MOCHA_ENV-config.yaml"
 
-PRODUCT_NAME="edgemicro_product_nightly"
-PROXY_NAME="edgemicro_proxy_nightly"
-DEVELOPER_NAME="edgemicro_dev_nightly"
-DEVELOPER_APP_NAME="edgemicro_dev_app_nightly"
+NODEVERSION=$(node --version)
+NODEMAJVER=$(echo $NODEVERSION | cut -d '.' -f1)
+
+PRODUCT_NAME="edgemicro_product_nightly${NODEMAJVER}"
+PROXY_NAME="edgemicro_proxy_nightly${NODEMAJVER}"
+DEVELOPER_NAME="edgemicro_dev_nightly${NODEMAJVER}"
+DEVELOPER_APP_NAME="edgemicro_dev_app_nightly${NODEMAJVER}"
+
+echo $PRODUCT_NAME
+echo $PROXY_NAME
+echo $DEVELOPER_NAME
+echo $DEVELOPER_APP_NAME
 
 echo $1
 which edgemicro

@@ -118,6 +118,8 @@ configureEMG() {
 
 verifyEMG() {
 
+  #set -x
+
   local result=0
 
   logInfo "Verifying EMG configuration"
@@ -126,10 +128,14 @@ verifyEMG() {
      result=1
      logError "Failed to verify EMG configuration edgemicro.configure.txt"
      return $result
-  fi 
+  fi
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
+  EMG_KEY=$(node splitLine edgemicro.configure.txt "key:")
+  echo $EMG_KEY
+  EMG_SECRET=$(node splitLine edgemicro.configure.txt "secret:")
+  echo $EMG_SECRET
+
+  #EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d 'secret: ')
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -152,6 +158,8 @@ verifyEMG() {
 
   rm -f verifyEMG.txt
 
+#set +x
+
   return $result
 
 }
@@ -163,8 +171,10 @@ startEMG() {
 
   logInfo "Start EMG"
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
+  EMG_KEY=$(node splitLine edgemicro.configure.txt "key:")
+  echo $EMG_KEY
+  EMG_SECRET=$(node splitLine edgemicro.configure.txt "secret:")
+  echo $EMG_SECRET
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -217,8 +227,10 @@ configAndReloadEMG() {
   node setYamlVars ${EMG_CONFIG_FILE} 'edgemicro.config_change_poll_interval' 10 'oauth.allowNoAuthorization' false 'edgemicro.plugins.sequence[1]' 'quota' > tmp_emg_file.yaml
   cp tmp_emg_file.yaml ${EMG_CONFIG_FILE}
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
+  EMG_KEY=$(node splitLine edgemicro.configure.txt "key:")
+  echo $EMG_KEY
+  EMG_SECRET=$(node splitLine edgemicro.configure.txt "secret:")
+  echo $EMG_SECRET
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -248,8 +260,10 @@ setProductNameFilter() {
   node setYamlVars ${EMG_CONFIG_FILE} 'edge_config.products' "https://${MOCHA_ORG}-${MOCHA_ENV}.apigee.net/edgemicro-auth/products?productnamefilter=.*$PRODUCT_NAME.*" > tmp_emg_file.yaml
   cp tmp_emg_file.yaml ${EMG_CONFIG_FILE}
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
+  EMG_KEY=$(node splitLine edgemicro.configure.txt "key:")
+  echo $EMG_KEY
+  EMG_SECRET=$(node splitLine edgemicro.configure.txt "secret:")
+  echo $EMG_SECRET
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -369,8 +383,12 @@ testInvalidJWT() {
   logInfo "Test Invalid JWT"
 
   apiJWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+
   curl -q -s http://localhost:8000/v1/${PROXY_NAME} -H "Authorization: Bearer $apiJWT" -D headers.txt > /dev/null 2>&1 ; ret=$?
   result=$(grep HTTP headers.txt | cut -d ' ' -f2)
+
+  cat  headers.txt
+
   if [ ${ret} -eq 0 -a ${result} -eq 401 ]; then
        logInfo "Successfully tested invalid JWT with code $result"
   else
@@ -392,14 +410,18 @@ testExpiredJWT() {
   logInfo "Test Expired JWT"
 
   apiJWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+
   curl -q -s http://localhost:8000/v1/${PROXY_NAME} -H "Authorization: Bearer $apiJWT" -D headers.txt > /dev/null 2>&1 ; ret=$?
   result=$(grep HTTP headers.txt | cut -d ' ' -f2)
+
   if [ ${ret} -eq 0 -a ${result} -eq 401 ]; then
        logInfo "Successfully tested expired JWT with code $result"
   else
        logError "Failed to test expired JWT with code $result"
        ret=1
   fi
+
+  cat  headers.txt
 
   rm -f headers.txt
 
@@ -413,8 +435,10 @@ setInvalidProductNameFilter() {
 
   logInfo "Set Invalid Product Name Filter"
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
+  EMG_KEY=$(node splitLine edgemicro.configure.txt "key:")
+  echo $EMG_KEY
+  EMG_SECRET=$(node splitLine edgemicro.configure.txt "secret:")
+  echo $EMG_SECRET
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
@@ -469,8 +493,10 @@ resetInvalidProductNameFilter() {
   node setYamlVars ${EMG_CONFIG_FILE} 'edge_config.products' "https://${MOCHA_ORG}-${MOCHA_ENV}.apigee.net/edgemicro-auth/products" > tmp_emg_file.yaml
   cp tmp_emg_file.yaml ${EMG_CONFIG_FILE}
 
-  EMG_KEY=$(cat edgemicro.configure.txt | grep "key:" | cut -d ' ' -f8)
-  EMG_SECRET=$(cat edgemicro.configure.txt | grep "secret:" | cut -d ' ' -f8)
+  EMG_KEY=$(node splitLine edgemicro.configure.txt "key:")
+  echo $EMG_KEY
+  EMG_SECRET=$(node splitLine edgemicro.configure.txt "secret:")
+  echo $EMG_SECRET
   if [ -z $EMG_KEY -o -z $EMG_SECRET ]; then
      result=1
      logError "Failed to retrieve emg key and secret from edgemicro.configure.txt"
