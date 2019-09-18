@@ -200,7 +200,7 @@ Gateway.prototype.start = (options,cb) => {
 
         //start the polling mechanism to look for config changes
         var reloadOnConfigChange = (oldConfig, cache, opts) => {
-            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'Checking for change in configuration');
+            //putback    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'Checking for change in configuration');
             if (configurl) opts.configurl = configurl;
             //var self = this;
             edgeconfig.get(opts, (err, newConfig) => {
