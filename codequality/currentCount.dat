@@ -1,0 +1,9 @@
+{
+  "previous_error_count": 22,
+  "by_file": {
+    "../cli": 14,
+    "../cli/lib": 8
+  },
+  "quality": 22,
+  "syntax": 0
+}
