@@ -25,6 +25,169 @@ const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
 const CONSOLE_LOG_TAG_COMP = 'microgateway cmd';
 
+function checkReloadOptions(options) {
+    if (!options.key) {
+        return options.error('key is required');
+    }
+    if (!options.secret) {
+        return options.error('secret is required');
+    }
+    if (!options.org) {
+        return options.error('org is required');
+    }
+    if (!options.env) {
+        return options.error('env is required');
+    }
+    return true
+}
+
+function reloadExecRemoteConfig(options) {
+    //
+    options.configDir = options.configDir || os.homedir() + "/" + ".edgemicro";
+    if (!fs.existsSync(options.configDir)) fs.mkdirSync(options.configDir);
+    //
+    var fileName = options.org + "-" + options.env + "-config.yaml";
+    var filePath = options.configDir + "/" + fileName;
+    var parsedUrl = url.parse(options.configUrl, true);
+    //
+    debug(fileName);
+    debug(filePath);
+    debug(options.configUrl);
+    //
+    if (parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:") {
+        debug("downloading file...");
+        request.get(options.configUrl, function(error, response, body) {
+            if (error) {
+                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file did not download: " + error);
+                process.exit(1);
+            }
+            try {
+                debug(body);
+                fs.writeFileSync(filePath, body, 'utf8');
+                run.reload(options);
+            } catch (err) {
+                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file could not be written: " + err);
+                process.exit(1);
+            }
+        });
+    }
+}
+
+
+function startExecRemoteConfi(options) {
+    options.configDir = options.configDir || os.homedir() + "/" + ".edgemicro";
+    if (!fs.existsSync(options.configDir)) fs.mkdirSync(options.configDir);
+    var fileName = options.org + "-" + options.env + "-config.yaml";
+    debug(fileName);
+    var filePath = options.configDir + "/" + fileName;
+    debug(filePath);
+    var parsedUrl = url.parse(options.configUrl, true);
+    debug(options.configUrl);
+
+    if (parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:") {
+        debug("downloading file...");
+        request.get(options.configUrl, function(error, response, body) {
+            if (error) {
+                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file did not download: " + error);
+                process.exit(1);
+            }
+            try {
+                debug(body);
+                fs.writeFileSync(filePath, body, 'utf8');
+                run.start(options);
+            } catch (err) {
+                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file could not be written: " + err);
+                process.exit(1);
+            }
+        });
+    } else {
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"url protocol not supported: " + parsedUrl.protocol);
+        process.exit(1);
+    }
+
+}
+
+
+function startRunWithLocalOptions(options) {
+    //if any of these are set, look for environment variable
+    if (!process.env.EDGEMICRO_LOCAL && !process.env.EDGEMICRO_LOCAL_PROXY) {
+        return options.error('set the EDGEMICRO_LOCAL or EDGEMICRO_LOCAL_PROXY variable for apiProxyName parameter');
+        //process.exit(1);
+    } else if (process.env.EDGEMICRO_LOCAL && process.env.EDGEMICRO_LOCAL_PROXY) {
+        return options.error('set the EDGEMICRO_LOCAL or EDGEMICRO_LOCAL_PROXY; not both');
+        //process.exit(1);
+    } else {
+        if (options.apiProxyName && options.target && options.revision && options.basepath) {
+            if (!validateUrl(options.target)) {
+                return options.error('target endpoint not a valid url');
+                //process.exit(1);
+            }
+            if (process.env.EDGEMICRO_LOCAL) {
+                //create fake credentials - not used anywhere
+                options.key = 'dummy';
+                options.secret = 'dummy';
+            }
+            //start gateway
+            run.start(options);
+            return;
+        } else {
+            return options.error('apiProxyName, target, revision and basepath are all mandatory parms when EDGEMICRO_LOCAL or EDGEMICRO_LOCAL_PROXY is set');
+            //process.exit(1);
+        }
+    }
+}
+
+
+function startSetDirOptions(options) {
+    options.pluginDir = options.pluginDir || process.env.EDGEMICRO_PLUGIN_DIR;
+    options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
+}
+
+function startSetUrlOptions(options) {
+    options.configUrl = options.configUrl || process.env.EDGEMICRO_CONFIG_URL;
+    options.apiProxyName = options.apiProxyName || process.env.EDGEMICRO_API_PROXYNAME;
+    options.revision = options.revision || process.env.EDGEMICRO_API_REVISION;
+    options.basepath = options.basepath || process.env.EDGEMICRO_API_BASEPATH;
+    options.target = options.target || process.env.EDGEMICRO_API_TARGET;
+}
+
+function startSetOptions(options) {
+    options.secret = options.secret || process.env.EDGEMICRO_SECRET;
+    options.key = options.key || process.env.EDGEMICRO_KEY;
+    options.org = options.org || process.env.EDGEMICRO_ORG;
+    options.env = options.env || process.env.EDGEMICRO_ENV;
+    options.processes = options.processes || process.env.EDGEMICRO_PROCESSES;
+    startSetDirOptions(options)
+    startSetUrlOptions(options)
+}
+
+
+function checkStartOptions(options) {
+    if (options.port) {
+        portastic.test(options.port)
+            .then(function(isAvailable) {
+                if (!isAvailable) {
+                    options.error('port is not available.');
+                    process.exit(1);
+                }
+    
+            });
+    }
+    if (!options.key && !process.env.EDGEMICRO_LOCAL) {
+        return options.error('key is required');
+    }
+    if (!options.secret && !process.env.EDGEMICRO_LOCAL) {
+        return options.error('secret is required');
+    }
+    if (!options.org) {
+        return options.error('org is required');
+    }
+    if (!options.env) {
+        return options.error('env is required');
+    }
+}
+
+
 const setup = function setup() {
     commander
         .version(require('../package.json').version);
@@ -52,33 +215,24 @@ const setup = function setup() {
         .action((options) => {
             options.error = optionError(options);
             options.token = options.token || process.env.EDGEMICRO_SAML_TOKEN;
-
-            if (options.token) {
-                //If there is a token lets configure with standard opts.
-                if (!options.org) {
-                    return options.error('org is required');
-                }
-                if (!options.env) {
-                    return options.error('env is required');
-                }
+            //
+            if (!options.org) {
+                return options.error('org is required');
+            }
+            if (!options.env) {
+                return options.error('env is required');
+            }
+            //
+            if ( options.token ) {
                 options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
                 configure.configure(options, () => {});
-
             } else {
                 //If there is no token then we can go through the password process
                 if (!options.username) {
                     return options.error('username is required');
                 }
-                if (!options.org) {
-                    return options.error('org is required');
-                }
-                if (!options.env) {
-                    return options.error('env is required');
-                }
-                if (options.key || options.cert) {
-                    if (!options.key || !options.cert) {
-                        return options.error('key and cert must be passed together');
-                    }
+                if ( !(options.key && options.cert) ) {
+                    return options.error('key and cert must be passed together');
                 }
                 options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
                 promptForPassword(options, (options) => {
@@ -88,8 +242,7 @@ const setup = function setup() {
                     configure.configure(options, () => {});
                 })
             }
-
-
+            //
         });
 
     commander
@@ -146,105 +299,22 @@ const setup = function setup() {
         .description('start the gateway based on configuration')
         .action((options) => {
             options.error = optionError(options);
-            options.secret = options.secret || process.env.EDGEMICRO_SECRET;
-            options.key = options.key || process.env.EDGEMICRO_KEY;
-            options.org = options.org || process.env.EDGEMICRO_ORG;
-            options.env = options.env || process.env.EDGEMICRO_ENV;
-            options.processes = options.processes || process.env.EDGEMICRO_PROCESSES;
-            options.pluginDir = options.pluginDir || process.env.EDGEMICRO_PLUGIN_DIR;
-            options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
-            options.configUrl = options.configUrl || process.env.EDGEMICRO_CONFIG_URL;
-            options.apiProxyName = options.apiProxyName || process.env.EDGEMICRO_API_PROXYNAME;
-            options.revision = options.revision || process.env.EDGEMICRO_API_REVISION;
-            options.basepath = options.basepath || process.env.EDGEMICRO_API_BASEPATH;
-            options.target = options.target || process.env.EDGEMICRO_API_TARGET;
+            startSetOptions(options)
 
             debug("EDGEMICRO_LOCAL: " + process.env.EDGEMICRO_LOCAL)
             debug("EDGEMICRO_LOCAL_PROXY: " + process.env.EDGEMICRO_LOCAL_PROXY)
 
-            if (options.port) {
-                portastic.test(options.port)
-                    .then(function(isAvailable) {
-                        if (!isAvailable) {
-                            options.error('port is not available.');
-                            process.exit(1);
-                        }
-
-                    });
-            }
-            if (!options.key && !process.env.EDGEMICRO_LOCAL) {
-                return options.error('key is required');
-            }
-            if (!options.secret && !process.env.EDGEMICRO_LOCAL) {
-                return options.error('secret is required');
-            }
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
-            if (options.apiProxyName || options.target || options.revision || options.basepath || process.env.EDGEMICRO_LOCAL || process.env.EDGEMICRO_LOCAL_PROXY) {
-                //if any of these are set, look for environment variable
-                if (!process.env.EDGEMICRO_LOCAL && !process.env.EDGEMICRO_LOCAL_PROXY) {
-                    return options.error('set the EDGEMICRO_LOCAL or EDGEMICRO_LOCAL_PROXY variable for apiProxyName parameter');
-                    //process.exit(1);
-                } else if (process.env.EDGEMICRO_LOCAL && process.env.EDGEMICRO_LOCAL_PROXY) {
-                    return options.error('set the EDGEMICRO_LOCAL or EDGEMICRO_LOCAL_PROXY; not both');
-                    //process.exit(1);
+            if ( checkStartOptions(options) ) {
+                if (options.apiProxyName || options.target || options.revision || options.basepath || process.env.EDGEMICRO_LOCAL || process.env.EDGEMICRO_LOCAL_PROXY) {
+                    startRunWithLocalOptions(options)
+                } else if (options.configUrl) {
+                    startExecRemoteConfi(options);
                 } else {
-                    if (options.apiProxyName && options.target && options.revision && options.basepath) {
-                        if (!validateUrl(options.target)) {
-                            return options.error('target endpoint not a valid url');
-                            //process.exit(1);
-                        }
-                        if (process.env.EDGEMICRO_LOCAL) {
-                            //create fake credentials - not used anywhere
-                            options.key = 'dummy';
-                            options.secret = 'dummy';
-                        }
-                        //start gateway
-                        run.start(options);
-                        return;
-                    } else {
-                        return options.error('apiProxyName, target, revision and basepath are all mandatory parms when EDGEMICRO_LOCAL or EDGEMICRO_LOCAL_PROXY is set');
-                        //process.exit(1);
-                    }
+                    run.start(options);
                 }
+    
             }
-            if (options.configUrl) {
-                options.configDir = options.configDir || os.homedir() + "/" + ".edgemicro";
-                if (!fs.existsSync(options.configDir)) fs.mkdirSync(options.configDir);
-                var fileName = options.org + "-" + options.env + "-config.yaml";
-                debug(fileName);
-                var filePath = options.configDir + "/" + fileName;
-                debug(filePath);
-                var parsedUrl = url.parse(options.configUrl, true);
-                debug(options.configUrl);
 
-                if (parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:") {
-                    debug("downloading file...");
-                    request.get(options.configUrl, function(error, response, body) {
-                        if (error) {
-                            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file did not download: " + error);
-                            process.exit(1);
-                        }
-                        try {
-                            debug(body);
-                            fs.writeFileSync(filePath, body, 'utf8');
-                            run.start(options);
-                        } catch (err) {
-                            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file could not be written: " + err);
-                            process.exit(1);
-                        }
-                    });
-                } else {
-                    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"url protocol not supported: " + parsedUrl.protocol);
-                    process.exit(1);
-                }
-            } else {
-                run.start(options);
-            }
         });
 
     commander
@@ -257,6 +327,7 @@ const setup = function setup() {
         .option('-u, --configUrl <configUrl>', 'Provide the endpoint to download the edgemicro config file')
         .description('reload the edgemicro cluster by pulling new configuration')
         .action((options) => {
+            //
             options.error = optionError(options);
             options.secret = options.secret || process.env.EDGEMICRO_SECRET;
             options.key = options.key || process.env.EDGEMICRO_KEY;
@@ -264,46 +335,11 @@ const setup = function setup() {
             options.env = options.env || process.env.EDGEMICRO_ENV;
             options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
             options.configUrl = options.configUrl || process.env.EDGEMICRO_CONFIG_URL;
-            if (!options.key) {
-                return options.error('key is required');
+            if ( checkReloadOptions(options) ) {
+                if (options.configUrl) {
+                    reloadExecRemoteConfig(options) 
+                } else run.reload(options);
             }
-            if (!options.secret) {
-                return options.error('secret is required');
-            }
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
-            if (options.configUrl) {
-                options.configDir = options.configDir || os.homedir() + "/" + ".edgemicro";
-                if (!fs.existsSync(options.configDir)) fs.mkdirSync(options.configDir);
-                var fileName = options.org + "-" + options.env + "-config.yaml";
-                debug(fileName);
-                var filePath = options.configDir + "/" + fileName;
-                debug(filePath);
-                var parsedUrl = url.parse(options.configUrl, true);
-                debug(options.configUrl);
-
-                if (parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:") {
-                    debug("downloading file...");
-                    request.get(options.configUrl, function(error, response, body) {
-                        if (error) {
-                            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file did not download: " + error);
-                            process.exit(1);
-                        }
-                        try {
-                            debug(body);
-                            fs.writeFileSync(filePath, body, 'utf8');
-                            run.reload(options);
-                        } catch (err) {
-                            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"config file could not be written: " + err);
-                            process.exit(1);
-                        }
-                    });
-                }
-            } else run.reload(options);
         });
 
     commander

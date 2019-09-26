@@ -30,22 +30,39 @@ module.exports = function() {
 };
 
 
-// begins edgemicro configuration process
-Private.prototype.configureEdgemicro = function(options, cb) {
-    if (!fs.existsSync(configLocations.getDefaultPath(options.configDir))) {
-        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"Missing %s, Please run 'edgemicro init'", configLocations.getDefaultPath(options.configDir))
-        return cb("Please call edgemicro init first")
-    }
 
-    if (!options.token) {
-        assert(options.username, 'username is required');
-        assert(options.password, 'password is required');
-    }
+function edgeConfigCallback(options,cb,that) {
+    edgeconfig.save(that.config, that.sourcePath);
+    options.deployed = false;
+    options.internaldeployed = false;
+    that.deployment.checkDeployedProxies(options, (err, options) => {
+        if (err) {
+            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
+            if ( cb ) { cb(err) } else process.exit(1);
+            return;
+        } else {
+            that.deployment.checkDeployedInternalProxies(options, (err, options) => {
+                if (err) {
+                    writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
+                    if ( cb ) { cb(err) } else process.exit(1);
+                    return;
+                } else {
+                    that.configureEdgemicroWithCreds(options, (err) => {
+                        if (err) {
+                            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
+                            if ( cb ) { cb(err) } else process.exit(1);
+                            return;
+                        }
+                        if ( cb ) { cb(err) } else process.exit(0);
+                    });
+                }
+            });
+        }
+    });
+}
 
-    assert(options.org, 'org is required');
-    assert(options.env, 'env is required');
-    assert(options.runtimeUrl, 'runtimeUrl is required');
-    assert(options.mgmtUrl, 'mgmtUrl is required');
+
+function setupCache(options) {
 
     const cache = configLocations.getCachePath(options.org, options.env);
     writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'delete cache config');
@@ -60,13 +77,51 @@ Private.prototype.configureEdgemicro = function(options, cb) {
         writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'deleted ' + targetPath);
     }
 
+}
+
+
+function checkOptions(options) {
+    //
+    if ( !options.token ) {
+        assert(options.username, 'username is required');
+        assert(options.password, 'password is required');
+    }
+    //
+    assert(options.org, 'org is required');
+    assert(options.env, 'env is required');
+    assert(options.runtimeUrl, 'runtimeUrl is required');
+    assert(options.mgmtUrl, 'mgmtUrl is required');
+}
+
+
+function intialize(options,configFileDirectory,cb,that) {
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'init config');
+    edgeconfig.init({
+        source: configLocations.getDefaultPath(options.configDir),
+        targetDir: configFileDirectory,
+        targetFile: configLocations.getSourceFile(options.org, options.env),
+        overwrite: true
+    }, () => { edgeConfigCallback(options,cb,that) });
+}
+
+
+// begins edgemicro configuration process
+Private.prototype.configureEdgemicro = function(options, cb) {
+
+    if ( !fs.existsSync(configLocations.getDefaultPath(options.configDir)) ) {
+        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"Missing %s, Please run 'edgemicro init'", configLocations.getDefaultPath(options.configDir))
+        return cb("Please call edgemicro init first")
+    }
+    //
+    checkOptions(options)
+    setupCache(options)
+    //
     options.proxyName = this.name = 'edgemicro-auth';
     this.basePath = '/edgemicro-auth';
     this.managementUri = options.mgmtUrl;
     this.runtimeUrl = options.runtimeUrl;
     this.virtualHosts = options.virtualHosts || 'default';
-
-
+    //
     const config = edgeconfig.load({
         source: configLocations.getDefaultPath(options.configDir)
     });
@@ -81,48 +136,12 @@ Private.prototype.configureEdgemicro = function(options, cb) {
     this.credentialUrl = util.format(this.baseUri, 'credential', options.org, options.env);
     this.regionUrl = util.format(this.baseUri, 'region', options.org, options.env);
     this.bootstrapUrl = util.format(this.baseUri, 'bootstrap', options.org, options.env);
-
+    //
     this.cert = cert(this.config);
     this.sourcePath = configLocations.getSourcePath(options.org, options.env);
-
+    //
     var configFileDirectory = options.configDir || configLocations.homeDir;
-
-    const that = this;
-    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'init config');
-    edgeconfig.init({
-        source: configLocations.getDefaultPath(options.configDir),
-        targetDir: configFileDirectory,
-        targetFile: configLocations.getSourceFile(options.org, options.env),
-        overwrite: true
-    }, function( /*err, configPath  */ ) {
-        edgeconfig.save(that.config, that.sourcePath);
-        options.deployed = false;
-        options.internaldeployed = false;
-        that.deployment.checkDeployedProxies(options, (err, options) => {
-            if (err) {
-                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
-                if ( cb ) { cb(err) } else process.exit(1);
-                return;
-            } else {
-                that.deployment.checkDeployedInternalProxies(options, (err, options) => {
-                    if (err) {
-                        writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
-                        if ( cb ) { cb(err) } else process.exit(1);
-                        return;
-                    } else {
-                        that.configureEdgemicroWithCreds(options, (err) => {
-                            if (err) {
-                                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
-                                if ( cb ) { cb(err) } else process.exit(1);
-                                return;
-                            }
-                            if ( cb ) { cb(err) } else process.exit(0);
-                        });
-                    }
-                });
-            }
-        });
-    });
+    intialize(options,configFileDirectory,cb,this)
 
 }
 
@@ -242,6 +261,81 @@ Private.prototype.configureEdgeMicroInternalProxy = function configureEdgeMicroI
     })
 }
 
+
+
+function configAgent(agentConfig,options,results,that) {
+
+    if (options.internaldeployed === false && options.deployed === false) {
+        agentConfig['edge_config']['jwt_public_key'] = results[2]; // get deploy results
+        agentConfig['edge_config'].bootstrap = results[4]; // get genkeys results
+    } else if (options.internaldeployed === true && options.internaldeployed === false) {
+        agentConfig['edge_config']['jwt_public_key'] = results[0];
+        agentConfig['edge_config'].bootstrap = results[2];
+    } else {
+        agentConfig['edge_config']['jwt_public_key'] = that.authUri + '/publicKey';
+        agentConfig['edge_config'].bootstrap = results[1];
+    }
+
+}
+
+function setPublicKeyURI(agentConfig) {
+
+    var publicKeyUri = agentConfig['edge_config']['jwt_public_key'];
+    if (publicKeyUri) {
+        agentConfig['edge_config']['products'] = publicKeyUri.replace('publicKey', 'products');
+
+        if (!agentConfig.hasOwnProperty('oauth') || agentConfig['oauth'] === null) {
+            agentConfig['oauth'] = {};
+        }
+        agentConfig['oauth']['verify_api_key_url'] = publicKeyUri.replace('publicKey', 'verifyApiKey');
+    }
+}
+
+
+function setBootstrapURI(agentConfig) {
+
+    var bootstrapUri = agentConfig['edge_config']['bootstrap'];
+    if (bootstrapUri) {
+        if (!agentConfig.hasOwnProperty('analytics') || agentConfig['analytics'] === null) {
+            agentConfig['analytics'] = {};
+        }
+
+        agentConfig['analytics']['uri'] = bootstrapUri.replace('bootstrap', 'axpublisher');
+        agentConfig['analytics']['bufferSize'] = 100;
+        agentConfig['analytics']['batchSize'] = 50;
+        agentConfig['analytics']['flushInterval'] = 500;
+    }
+
+}
+
+
+function seriesCallback(options,results,sourcePath,that) {
+
+    const agentConfigPath = sourcePath;
+    const agentConfig = that.config = edgeconfig.load({
+        source: agentConfigPath
+    });
+
+    configAgent(agentConfig,options,results,that)
+    setPublicKeyURI(agentConfig)
+    setBootstrapURI(agentConfig)
+    //
+    //
+    writeConsoleLog('log')
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'saving configuration information to:', agentConfigPath);
+    edgeconfig.save(agentConfig, agentConfigPath);
+    writeConsoleLog('log')
+    //
+    if (options.internaldeployed === false && options.deployed === false) {
+        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'vault info:\n', results[3]);
+    } else if (options.internaldeployed === true && options.internaldeployed === false) {
+        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'vault info:\n', results[1]);
+    }
+    //
+    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'edgemicro configuration complete!');
+}
+
+
 // checks deployments, deploys proxies as necessary, checks/installs certs, generates keys
 Private.prototype.configureEdgemicroWithCreds = function configureEdgemicroWithCreds(options, cb) {
     const that = this;
@@ -295,58 +389,8 @@ Private.prototype.configureEdgemicroWithCreds = function configureEdgemicroWithC
             if (err) {
                 return cb(err);
             }
-            const agentConfigPath = sourcePath;
-            const agentConfig = that.config = edgeconfig.load({
-                source: agentConfigPath
-            });
-
-            if (options.internaldeployed === false && options.deployed === false) {
-                agentConfig['edge_config']['jwt_public_key'] = results[2]; // get deploy results
-                agentConfig['edge_config'].bootstrap = results[4]; // get genkeys results
-            } else if (options.internaldeployed === true && options.internaldeployed === false) {
-                agentConfig['edge_config']['jwt_public_key'] = results[0];
-                agentConfig['edge_config'].bootstrap = results[2];
-            } else {
-                agentConfig['edge_config']['jwt_public_key'] = that.authUri + '/publicKey';
-                agentConfig['edge_config'].bootstrap = results[1];
-            }
-
-            var publicKeyUri = agentConfig['edge_config']['jwt_public_key'];
-            if (publicKeyUri) {
-                agentConfig['edge_config']['products'] = publicKeyUri.replace('publicKey', 'products');
-
-                if (!agentConfig.hasOwnProperty('oauth') || agentConfig['oauth'] === null) {
-                    agentConfig['oauth'] = {};
-                }
-                agentConfig['oauth']['verify_api_key_url'] = publicKeyUri.replace('publicKey', 'verifyApiKey');
-            }
-
-            var bootstrapUri = agentConfig['edge_config']['bootstrap'];
-            if (bootstrapUri) {
-                if (!agentConfig.hasOwnProperty('analytics') || agentConfig['analytics'] === null) {
-                    agentConfig['analytics'] = {};
-                }
-
-                agentConfig['analytics']['uri'] = bootstrapUri.replace('bootstrap', 'axpublisher');
-                agentConfig['analytics']['bufferSize'] = 100;
-                agentConfig['analytics']['batchSize'] = 50;
-                agentConfig['analytics']['flushInterval'] = 500;
-            }
-
-            writeConsoleLog('log')
-            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'saving configuration information to:', agentConfigPath);
-            edgeconfig.save(agentConfig, agentConfigPath);
-            writeConsoleLog('log')
-
-            if (options.internaldeployed === false && options.deployed === false) {
-		writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'vault info:\n', results[3]);
-            } else if (options.internaldeployed === true && options.internaldeployed === false) {
-		writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'vault info:\n', results[1]);
-            }
-
-            writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'edgemicro configuration complete!');
+            seriesCallback(options,results,sourcePath,that)
             cb();
-
         });
 };
 

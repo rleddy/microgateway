@@ -82,52 +82,9 @@ Gateway.prototype.start = (options,cb) => {
         org: options.org,
         env: options.env
     }
+    
 
-    edgeconfig.get(configOptions, (err, config) => {
-        if (err) {
-            const exists = fs.existsSync(cache);
-            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"failed to retieve config from gateway. continuing, will try cached copy..");
-            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
-            if (!exists) {
-                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'cache configuration ' + cache + ' does not exist. exiting.');
-                return;
-            } else {
-                writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'using cached configuration from %s', cache);
-                config = edgeconfig.load({
-                    source: cache
-                });
-                if (options.port) {
-                    config.edgemicro.port = parseInt(options.port);
-                }
-            }
-        } else {
-            if (options.port) {
-                config.edgemicro.port = parseInt(options.port);
-            }
-            edgeconfig.save(config, cache);
-        }
-
-        config.uid = uuid();
-        initializeMicroGatewayLogging(config,options);
-
-        var opt = {};
-        delete args.keys;
-        //set pluginDir
-        if (!args.pluginDir) {
-            if (config.edgemicro.plugins.dir) {
-                args.pluginDir = path.resolve(config.edgemicro.plugins.dir);
-            }
-        }
-        opt.args = [JSON.stringify(args)];
-        opt.timeout = 10;
-        opt.logger = gateway.Logging.getLogger();
-
-        //Let reload cluster know how many processes to use if the user doesn't want the default
-        if (options.processes) {
-            opt.workers = Number(options.processes);
-        }
-
-        var mgCluster = reloadCluster(path.join(__dirname, 'start-agent.js'), opt);
+    function serverOps(config,mgCluster) {
 
         var server = net.createServer();
         server.listen(ipcPath);
@@ -163,10 +120,39 @@ Gateway.prototype.start = (options,cb) => {
                 }
             });
         });
+    }
 
-        mgCluster.run();
-        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'PROCESS PID : ' + process.pid);
-        fs.appendFileSync(pidPath, process.pid);
+    // -------- -------- -------- -------- -------- --------
+
+    function handleError(err,config) {
+        if (err) {
+            const exists = fs.existsSync(cache);
+            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},"failed to retieve config from gateway. continuing, will try cached copy..");
+            writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},err);
+            if (!exists) {
+                writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},'cache configuration ' + cache + ' does not exist. exiting.');
+                return false;
+            } else {
+                writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'using cached configuration from %s', cache);
+                config = edgeconfig.load({
+                    source: cache
+                });
+                if (options.port) {
+                    config.edgemicro.port = parseInt(options.port);
+                }
+            }
+        } else {
+            if (options.port) {
+                config.edgemicro.port = parseInt(options.port);
+            }
+            edgeconfig.save(config, cache);
+        }
+        return true;
+    }
+
+    // -------- -------- -------- -------- -------- --------
+
+    function processsManagement() {
 
         process.on('exit', () => {
             if (!isWin) {
@@ -191,12 +177,19 @@ Gateway.prototype.start = (options,cb) => {
             process.exit(0);
         });
 
+    }
+
+    // -------- -------- -------- -------- -------- --------
+
+    function setupReloading(config) {
+
         var shouldNotPoll = config.edgemicro.disable_config_poll_interval || false;
         var pollInterval = config.edgemicro.config_change_poll_interval || defaultPollInterval;
         // Client Socket for auto reload
         // send reload message to socket.
         var clientSocket = new JsonSocket(new net.Socket()); //Decorate a standard net.Socket with JsonSocket
         clientSocket.connect(ipcPath);
+
 
         //start the polling mechanism to look for config changes
         var reloadOnConfigChange = (oldConfig, cache, opts) => {
@@ -236,8 +229,49 @@ Gateway.prototype.start = (options,cb) => {
             }, pollInterval * 1000);
         }
         
+    }
+
+    // -------- -------- -------- -------- -------- --------
+    
+
+    edgeconfig.get(configOptions, (err, config) => {
+        if ( !handleError(err,config) ) {
+            return;
+        }
+
+        config.uid = uuid();
+        initializeMicroGatewayLogging(config,options);
+
+        var opt = {};
+        delete args.keys;
+        //set pluginDir
+        if (!args.pluginDir) {
+            if (config.edgemicro.plugins.dir) {
+                args.pluginDir = path.resolve(config.edgemicro.plugins.dir);
+            }
+        }
+        opt.args = [JSON.stringify(args)];
+        opt.timeout = 10;
+        opt.logger = gateway.Logging.getLogger();
+
+        //Let reload cluster know how many processes to use if the user doesn't want the default
+        if (options.processes) {
+            opt.workers = Number(options.processes);
+        }
+        //
+        var mgCluster = reloadCluster(path.join(__dirname, 'start-agent.js'), opt);
+        serverOps(config,mgCluster)
+        //
+        mgCluster.run();
+        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},'PROCESS PID : ' + process.pid);
+        fs.appendFileSync(pidPath, process.pid);
+        //
+        processsManagement() 
+        //
+        setupReloading(config)
+
         if ( cb && (typeof cb === "function") ) {
-	    writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Calling cb")
+	        writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"Calling cb")
             cb();
         }
         

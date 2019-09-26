@@ -13,6 +13,26 @@ const CONSOLE_LOG_TAG_COMP = 'microgateway cmd private';
 
 var prompt = require('cli-prompt');
 
+
+function authorize(options) {
+    //if token is not passed, username is mandatory
+    if (!options.token) {
+        //If there is no token then we can go through the password process
+        if (!options.username) {
+            return options.error('username is required');
+        }
+        if (!options.password) {
+            promptForPassword(options, (options) => {
+                if (!options.password) {
+                    return options.error('password is required');
+                }
+            });
+        }
+    }
+    return(true)
+}
+
+
 module.exports = function() {
     //
     app
@@ -71,46 +91,30 @@ module.exports = function() {
             if (!options.org) {
                 return options.error('org is required');
             }
+
             if (!options.env) {
                 return options.error('env is required');
-            }            
-            //if token is not passed, username is mandatory
-            if (!options.token) {
-                //If there is no token then we can go through the password process
-                if (!options.username) {
-                    return options.error('username is required');
-                }
-                if (!options.password) {
-                    promptForPassword(options, (options) => {
-                        if (!options.password) {
-                            return options.error('password is required');
-                        }
-                    });
-                }
             }
 
-            if (options.key || options.cert) {
-                if (!options.key || !options.cert) {
-                    return options.error('key and cert must be passed together');
-                }
+            if ( !((options.key !== undefined) && (options.cert !== undefined)) ) {
+                return options.error('key and cert must be passed together');
             }
-
+            //
             if (!options.runtimeUrl) {
                 return options.error('runtimeUrl is required');
             }
-            /*
-            if (!options.mgmtUrl) {
-                return options.error('mgmtUrl is required');
-            }
-            */
-            if (!options.runtimeUrl.includes('http')) {
-                return options.error('runtimeUrl requires a prototcol http or https');
-            }
-            if (!options.mgmtUrl.includes('http')) {
+
+            if (!options.runtimeUrl.includes('http') || !options.mgmtUrl.includes('http') ) {
                 return options.error('runtimeUrl requires a prototcol http or https');
             }
 
-            privateOperations.configureEdgemicro(options);
+            var auth = authorize(options)
+            if ( auth ) {
+                privateOperations.configureEdgemicro(options);
+            } else {
+                return auth
+            }
+
         });
 
     app
