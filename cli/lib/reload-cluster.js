@@ -16,6 +16,7 @@ const DEFAULT_PROCESS_CHECK_INTERVAL = 10000
 const RAPID_REPLAY_INTERVAL_STOPPED_PROCESSES = 50
 const CALLBACK_TIMEOUT = 5000
 const MAX_CONNECT_FAIL_TIME = 200
+const SAFETY_TIMEOUT = 10000
 
 
 //
@@ -611,7 +612,7 @@ class ClusterManager extends EventEmitter {
       clearOutStoppedProcesses()
       this.stop();
       cb()
-    },10000)
+    },SAFETY_TIMEOUT)
     // this should do the trick
     cluster.disconnect(() => {
       clearTimeout(safetyTimeout);
@@ -621,21 +622,21 @@ class ClusterManager extends EventEmitter {
     })  // kill after disconnect by cleaning up
   }
 
-    // -----countTracked--------------------------------------------------
-    // for testing or info check
-    countTracked() {
-      return(Object.keys(tTracked).length)
-    }
+  // -----countTracked--------------------------------------------------
+  // for testing or info check
+  countTracked() {
+    return(Object.keys(tTracked).length)
+  }
 
-    // -----countTracked--------------------------------------------------
-    // for testing or info check
-    countClosing() {
-      return(Object.keys(tClosers).length)
-    }
+  // -----countTracked--------------------------------------------------
+  // for testing or info check
+  countClosing() {
+    return(Object.keys(tClosers).length)
+  }
 
-    countCluster() {
-      return(Object.keys(cluster.workers).length)
-    }
+  countCluster() {
+    return(Object.keys(cluster.workers).length)
+  }
 }
 
 

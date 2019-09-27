@@ -24,22 +24,87 @@ var portastic = require('portastic');
 const writeConsoleLog = require('microgateway-core').Logging.writeConsoleLog;
 
 const CONSOLE_LOG_TAG_COMP = 'microgateway cmd';
+const SUCESSFUL_OPTION = true
 
-function checkReloadOptions(options) {
+
+
+function optionCheckOrgEnv(options) {
+    if (!options.org) {
+        options.error('org is required');    // exits 
+    }
+    if (!options.env) {
+        options.error('env is required');    // exits 
+    }
+    return SUCESSFUL_OPTION    
+}
+
+function optionCheckKeySecret(options) {
     if (!options.key) {
         return options.error('key is required');
     }
     if (!options.secret) {
         return options.error('secret is required');
     }
-    if (!options.org) {
-        return options.error('org is required');
-    }
-    if (!options.env) {
-        return options.error('env is required');
-    }
-    return true
+    return SUCESSFUL_OPTION    
 }
+
+
+function optionsCheckKid(options) {
+    if (!options.kid) {
+        return options.error('kid is required');
+    }
+}
+
+
+function optionsCheckUserName(options) {
+    if (!options.username) {
+        return options.error('username is required');
+    }
+}
+
+function optionsCheckPassword(options) {
+    if (!options.password) {
+        return options.error('password is required');
+    }
+}
+
+function checkUserCredentials(options,cb) {
+    optionsCheckUserName(options)
+    promptForPassword(options, (options) => {
+        optionsCheckPassword(options)
+        if ( cb !== undefined ) cb()
+    })
+}
+
+//// Specific Calls
+
+// for the reload command
+function checkReloadOptions(options) {
+    optionCheckKeySecret(options)
+    return optionCheckOrgEnv(options)
+}
+
+
+// for the start command
+function checkStartOptions(options) {
+    //
+    if (options.port) {
+        portastic.test(options.port)
+            .then(function(isAvailable) {
+                if (!isAvailable) {
+                    options.error('port is not available.');
+                    process.exit(1);
+                }
+    
+            });
+    }
+
+    optionCheckKeySecret(options)
+    return optionCheckOrgEnv(options)
+}
+
+// =====================================================================
+
 
 function reloadExecRemoteConfig(options) {
     //
@@ -75,13 +140,14 @@ function reloadExecRemoteConfig(options) {
 
 
 function startExecRemoteConfi(options) {
-    options.configDir = options.configDir || os.homedir() + "/" + ".edgemicro";
     if (!fs.existsSync(options.configDir)) fs.mkdirSync(options.configDir);
+    //
     var fileName = options.org + "-" + options.env + "-config.yaml";
-    debug(fileName);
     var filePath = options.configDir + "/" + fileName;
-    debug(filePath);
     var parsedUrl = url.parse(options.configUrl, true);
+    //
+    debug(fileName);
+    debug(filePath);
     debug(options.configUrl);
 
     if (parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:") {
@@ -138,57 +204,61 @@ function startRunWithLocalOptions(options) {
 }
 
 
-function startSetDirOptions(options) {
-    options.pluginDir = options.pluginDir || process.env.EDGEMICRO_PLUGIN_DIR;
+
+function optionsSetToken(options) {
+    options.token = options.token || process.env.EDGEMICRO_SAML_TOKEN;
+}
+
+
+function optionsSetConfigDir(options) {
     options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
 }
 
-function startSetUrlOptions(options) {
+
+function optionsSetOrgEnv(options) {
+    options.org = options.org || process.env.EDGEMICRO_ORG;
+    options.env = options.env || process.env.EDGEMICRO_ENV;
+}
+
+function optionsSetKeySecret(options) {
+    options.secret = options.secret || process.env.EDGEMICRO_SECRET;
+    options.key = options.key || process.env.EDGEMICRO_KEY;
+}
+
+function startSetDirOptions(options) {
+    options.pluginDir = options.pluginDir || process.env.EDGEMICRO_PLUGIN_DIR;
+}
+
+function setConfigUrl(options) {
     options.configUrl = options.configUrl || process.env.EDGEMICRO_CONFIG_URL;
+}
+
+function startSetUrlOptions(options) {
     options.apiProxyName = options.apiProxyName || process.env.EDGEMICRO_API_PROXYNAME;
     options.revision = options.revision || process.env.EDGEMICRO_API_REVISION;
     options.basepath = options.basepath || process.env.EDGEMICRO_API_BASEPATH;
     options.target = options.target || process.env.EDGEMICRO_API_TARGET;
 }
 
+function setGeneralRunOptions(options) {
+    optionsSetKeySecret(options)
+    optionsSetOrgEnv(options)
+    setConfigUrl(options)
+    optionsSetConfigDir(options)
+
+}
+
 function startSetOptions(options) {
-    options.secret = options.secret || process.env.EDGEMICRO_SECRET;
-    options.key = options.key || process.env.EDGEMICRO_KEY;
-    options.org = options.org || process.env.EDGEMICRO_ORG;
-    options.env = options.env || process.env.EDGEMICRO_ENV;
     options.processes = options.processes || process.env.EDGEMICRO_PROCESSES;
+    setGeneralRunOptions(options)
     startSetDirOptions(options)
     startSetUrlOptions(options)
 }
 
 
-function checkStartOptions(options) {
-    if (options.port) {
-        portastic.test(options.port)
-            .then(function(isAvailable) {
-                if (!isAvailable) {
-                    options.error('port is not available.');
-                    process.exit(1);
-                }
-    
-            });
-    }
-    if (!options.key && !process.env.EDGEMICRO_LOCAL) {
-        return options.error('key is required');
-    }
-    if (!options.secret && !process.env.EDGEMICRO_LOCAL) {
-        return options.error('secret is required');
-    }
-    if (!options.org) {
-        return options.error('org is required');
-    }
-    if (!options.env) {
-        return options.error('env is required');
-    }
-
-    return true
+function reloadSetOptions(options) {
+    setGeneralRunOptions(options)
 }
-
 
 const setup = function setup() {
     commander
@@ -216,33 +286,24 @@ const setup = function setup() {
         .option('-s  --cert <cert>', 'Path to certificate to be used by Apigee Edge')
         .action((options) => {
             options.error = optionError(options);
-            options.token = options.token || process.env.EDGEMICRO_SAML_TOKEN;
             //
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
+            optionsSetToken(options)
+            optionsSetConfigDir(options) 
             //
-            if ( options.token ) {
-                options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
-                configure.configure(options, () => {});
-            } else {
-                //If there is no token then we can go through the password process
-                if (!options.username) {
-                    return options.error('username is required');
-                }
-                if ( (options.key || options.cert) && !(options.key && options.cert) ) {
-                    return options.error('key and cert must be passed together');
-                }
-                options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
-                promptForPassword(options, (options) => {
-                    if (!options.password) {
-                        return options.error('password is required');
-                    }
+            var optsOK = optionCheckOrgEnv(options)
+            if ( optsOK ) {
+                if ( options.token ) {
                     configure.configure(options, () => {});
-                })
+                } else {
+                    //If there is no token then we can go through the password process
+                    if ( (options.key || options.cert) && !(options.key && options.cert) ) {
+                        return options.error('key and cert must be passed together');
+                    }
+                    //
+                    checkUserCredentials(options,() => { configure.configure(options, () => {}); })
+                }    
+            } else {
+                return optsOK
             }
             //
         });
@@ -252,7 +313,7 @@ const setup = function setup() {
         .description('initialize default.yaml into home dir')
         .option('-c, --configDir <configDir>', 'Set the directory where configs are written.')
         .action((options) => {
-            options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
+            optionsSetConfigDir(options) 
             init(options, (err, location) => {
                 writeConsoleLog('log',{component: CONSOLE_LOG_TAG_COMP},"config initialized to %s", location)
             })
@@ -267,18 +328,9 @@ const setup = function setup() {
         .option('-s, --secret <secret>', 'secret for authenticating with Edge')
         .action((options) => {
             options.error = optionError(options);
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
-            if (!options.key) {
-                return options.error('key is required');
-            }
-            if (!options.secret) {
-                return options.error('secret is required');
-            }
+            //
+            optionCheckOrgEnv(options)
+            optionCheckKeySecret(options)
             verify.verify(options);
         });
 
@@ -301,6 +353,7 @@ const setup = function setup() {
         .description('start the gateway based on configuration')
         .action((options) => {
             options.error = optionError(options);
+            //
             startSetOptions(options)
 
             debug("EDGEMICRO_LOCAL: " + process.env.EDGEMICRO_LOCAL)
@@ -309,12 +362,12 @@ const setup = function setup() {
             if ( checkStartOptions(options) ) {
                 if (options.apiProxyName || options.target || options.revision || options.basepath || process.env.EDGEMICRO_LOCAL || process.env.EDGEMICRO_LOCAL_PROXY) {
                     startRunWithLocalOptions(options)
-                } else if (options.configUrl) {
+                } else if ( options.configUrl ) {
+                    options.configDir = options.configDir || os.homedir() + "/" + ".edgemicro";
                     startExecRemoteConfi(options);
                 } else {
                     run.start(options);
                 }
-    
             }
 
         });
@@ -329,16 +382,12 @@ const setup = function setup() {
         .option('-u, --configUrl <configUrl>', 'Provide the endpoint to download the edgemicro config file')
         .description('reload the edgemicro cluster by pulling new configuration')
         .action((options) => {
-            //
             options.error = optionError(options);
-            options.secret = options.secret || process.env.EDGEMICRO_SECRET;
-            options.key = options.key || process.env.EDGEMICRO_KEY;
-            options.org = options.org || process.env.EDGEMICRO_ORG;
-            options.env = options.env || process.env.EDGEMICRO_ENV;
-            options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
-            options.configUrl = options.configUrl || process.env.EDGEMICRO_CONFIG_URL;
+            //
+            reloadSetOptions(options)
+            //
             if ( checkReloadOptions(options) ) {
-                if (options.configUrl) {
+                if ( options.configUrl ) {
                     reloadExecRemoteConfig(options) 
                 } else run.reload(options);
             }
@@ -420,19 +469,9 @@ const setup = function setup() {
         .description('generate authentication keys for runtime auth between Microgateway and Edge')
         .action((options) => {
             options.error = optionError(options);
-            if (!options.username) {
-                return options.error('username is required');
-            }
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
-            promptForPassword(options, (options) => {
-                if (!options.password) {
-                    return options.error('password is required');
-                }
+            //
+            optionCheckOrgEnv(options)
+            checkUserCredentials(options,() => {
                 keyGenerator.generate(options, (err) => {
                     if ( err ) {
                         process.exit(1)
@@ -441,7 +480,6 @@ const setup = function setup() {
                     }
                 });
             })
-
         });
 
     commander
@@ -455,25 +493,10 @@ const setup = function setup() {
         .description('revoke authentication keys for runtime auth between Microgateway and Edge')
         .action((options) => {
             options.error = optionError(options);
-            if (!options.username) {
-                return options.error('username is required');
-            }
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
-            if (!options.key) {
-                return options.error('key is required');
-            }
-            if (!options.secret) {
-                return options.error('secret is required');
-            }
-            promptForPassword(options, (options) => {
-                if (!options.password) {
-                    return options.error('password is required');
-                }
+            //
+            optionCheckOrgEnv(options)
+            optionCheckKeySecret(options)
+            checkUserCredentials(options,() => { 
                 keyGenerator.revoke(options, (err) => {
                     if ( err ) {
                         process.exit(1)
@@ -481,8 +504,7 @@ const setup = function setup() {
                         process.exit(0)
                     }
                 });
-            });
-
+            })
         });
 
     commander
@@ -497,25 +519,14 @@ const setup = function setup() {
         .description('upgrade kvm to support JWT Key rotation')
         .action((options) => {
             options.error = optionError(options);
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
+            //
+            optionCheckOrgEnv(options)
             if (options.token) {
                 upgradekvm.upgradekvm(options, () => {});
             } else {
-                if (!options.username) {
-                    return options.error('username is required');
-                }
-                promptForPassword(options, (options) => {
-                    if (!options.password) {
-                        return options.error('password is required');
-                    }
-                    upgradekvm.upgradekvm(options, () => {});
-                });
+                checkUserCredentials(options,() => { upgradekvm.upgradekvm(options, () => {}); })
             }
+            //
         });
 
     commander
@@ -530,26 +541,13 @@ const setup = function setup() {
         .description('upgrade edgemicro-auth proxy')
         .action((options) => {
             options.error = optionError(options);
-            options.token = options.token || process.env.EDGEMICRO_SAML_TOKEN;
-
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
+            //
+            optionsSetToken(options)
+            optionCheckOrgEnv(options)
             if (options.token) {
                 upgradeauth.upgradeauth(options, () => {});
             } else {
-                if (!options.username) {
-                    return options.error('username is required');
-                }
-                promptForPassword(options, (options) => {
-                    if (!options.password) {
-                        return options.error('password is required');
-                    }
-                    upgradeauth.upgradeauth(options, () => {});
-                });
+                checkUserCredentials(options,() => { upgradeauth.upgradeauth(options, () => {}); })
             }
         });
 
@@ -565,24 +563,11 @@ const setup = function setup() {
         .description('Rotate JWT Keys')
         .action((options) => {
             options.error = optionError(options);
-            if (!options.username) {
-                return options.error('username is required');
-            }
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
-            if (!options.kid) {
-                return options.error('kid is required');
-            }
-            promptForPassword(options, (options) => {
-                if (!options.password) {
-                    return options.error('password is required');
-                }
-                rotatekey.rotatekey(options, () => {});
-            })
+            //
+            optionsCheckKid(options)
+            optionCheckOrgEnv(options)
+           //
+            checkUserCredentials(options,() => { rotatekey.rotatekey(options, () => {}); })
         });
 
     commander
@@ -593,46 +578,35 @@ const setup = function setup() {
         .option('-p, --password <password>', 'password of the organization admin')
         .description('clean up microgateway artifacts from the org')
         .action((options) => {
+            //
             options.error = optionError(options);
-            if (!options.username) {
-                return options.error('username is required');
-            }
-            if (!options.org) {
-                return options.error('org is required');
-            }
-            if (!options.env) {
-                return options.error('env is required');
-            }
-            if (!options.kid) {
-                return options.error('kid is required');
-            }
-            promptForPassword(options, (options) => {
-                if (!options.password) {
-                    return options.error('password is required');
-                }
-                //TODO
-            })
+            optionCheckOrgEnv(options)
+            optionsCheckKid(options)
+            //
+            checkUserCredentials(options,undefined)
         });
 
+    // run the response to prompts
     commander.parse(process.argv);
-
-
+    //
     var running = false;
     commander.commands.forEach(function(command) {
         if (command._name === commander.rawArgs[2]) {
             running = true;
         }
     });
+    //
     if (!running) {
         commander.help();
     }
 };
 
+
 function optionError(caller) {
     return(((obj) => { 
       return((message) => {
         writeConsoleLog('error',{component: CONSOLE_LOG_TAG_COMP},message);
-        obj.help();  
+        obj.help();  // exits the program
       });
      })(caller))
 }

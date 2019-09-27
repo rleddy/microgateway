@@ -4,11 +4,36 @@
 
 const assert = require('assert');
 const rewire = require('rewire')
+var EventEmitter = require('events').EventEmitter;
+
 
 const reloadCluster = rewire('../cli/lib/reload-cluster.js');
 const itemManagers = require('../cli/lib/util/item-managers.js')
 
 const path = require('path');
+
+
+
+
+var mockLogger = {
+    info: function (obj, msg) {
+    },
+    warn: function (obj, msg) {
+		console.log(obj)  // this is how it is for
+    },
+    error: function (obj, msg) {
+    },
+    eventLog: function (obj, msg) {
+    },
+    consoleLog: function (level, ...data) {
+    },
+    stats: function (statsInfo, msg) {
+    },
+    setLevel: function (level) {
+    },
+    writeLogRecord: function(record,cb) {              
+    }
+  };
 
 
 
@@ -75,6 +100,12 @@ describe('reaload-cluster module', () => {
 		assert(cbl.items.length === 3)
 		cbl.runCallBacks()
 		assert(nn === 6)
+		cbl.clear()
+		//
+		cbl.add(null)
+		cbl.runCallBacks()
+		cbl.add(() => {  assert(false); })
+		cbl.runCallBacks()
 		//
 		done()
 	});
@@ -103,7 +134,19 @@ describe('reaload-cluster module', () => {
 		assert(exitCounter.periods.length === 2)
 		assert(!state)
 
-		done()
+		exitCounter.periods = []
+		rate = exitCounter.averageRate()
+		assert(rate === 0)
+
+		exitCounter.periods = [1,2,3,4,5,6,7]
+		rate = exitCounter.averageRate()
+
+		var cb = (b) => {
+			clearInterval(exitCounter.checkInterval)
+			done()
+		}
+		exitCounter = new itemManagers.ExitCounter(3,cb,1)
+
 	});
 
 	// -------- -------- -------- -------- -------- -------- -------- -------- --------
@@ -206,96 +249,227 @@ describe('reaload-cluster module', () => {
 	});
 
 // -------- -------- -------- -------- -------- -------- -------- -------- --------
-it('test shouldTrackWorker',  (done) => {
-	//
-	var shouldTrackWorker = reloadCluster.__get__('shouldTrackWorker')
-	var WorkerInfo = reloadCluster.__get__('WorkerInfo')
+	it('test shouldTrackWorker',  (done) => {
+		//
+		var shouldTrackWorker = reloadCluster.__get__('shouldTrackWorker')
+		var WorkerInfo = reloadCluster.__get__('WorkerInfo')
 
-	//
-	reloadCluster.__set__('tTracked',{})
-	reloadCluster.__set__('tClosers',{})
-	//
-	var fauxWorker = { 
-		'id' : "testid",
-		'isConnected' : () => { return(false) }, 
-		'isDead' : () => { return(false) } 
-	}
-	var w_info = new WorkerInfo(fauxWorker)
+		//
+		reloadCluster.__set__('tTracked',{})
+		reloadCluster.__set__('tClosers',{})
+		//
+		var fauxWorker = { 
+			'id' : "testid",
+			'isConnected' : () => { return(false) }, 
+			'isDead' : () => { return(false) } 
+		}
+		var w_info = new WorkerInfo(fauxWorker)
 
-	var b = shouldTrackWorker(fauxWorker,true)
-	assert(!b)
-	b = shouldTrackWorker(fauxWorker,false)
-	assert(b)
+		var b = shouldTrackWorker(fauxWorker,true)
+		assert(!b)
+		b = shouldTrackWorker(fauxWorker,false)
+		assert(b)
 
-	reloadCluster.__set__('tTracked',{ 'testid' : w_info })
-	b = shouldTrackWorker(fauxWorker,false)
-	assert(!b)
-	b = shouldTrackWorker(fauxWorker,true)
-	assert(!b)
+		reloadCluster.__set__('tTracked',{ 'testid' : w_info })
+		b = shouldTrackWorker(fauxWorker,false)
+		assert(!b)
+		b = shouldTrackWorker(fauxWorker,true)
+		assert(!b)
 
-	w_info.connectedEvent = true
-	b = shouldTrackWorker(fauxWorker,false)
-	assert(!b)
-	b = shouldTrackWorker(fauxWorker,true)
-	assert(!b)
+		w_info.connectedEvent = true
+		b = shouldTrackWorker(fauxWorker,false)
+		assert(!b)
+		b = shouldTrackWorker(fauxWorker,true)
+		assert(!b)
 
-	fauxWorker = { 
-		'id' : "testid",
-		'isConnected' : () => { return(false) }, 
-		'isDead' : () => { return(true) } 
-	}
-	b = shouldTrackWorker(fauxWorker,false)
-	assert(!b)
-	b = shouldTrackWorker(fauxWorker,true)
-	assert(!b)
-
-
-	fauxWorker = { 
-		'id' : "testid",
-		'isConnected' : () => { return(true) }, 
-		'isDead' : () => { return(false) } 
-	}
-	b = shouldTrackWorker(fauxWorker,false)
-	assert(!b)
-	b = shouldTrackWorker(fauxWorker,true)
-	assert(!b)
-
-	reloadCluster.__set__('tTracked',{})
-	reloadCluster.__set__('tClosers',{ 'testid' : w_info })
-	b = shouldTrackWorker(fauxWorker,false)
-	assert(!b)
-	b = shouldTrackWorker(fauxWorker,true)
-	assert(!b)
-	//
-	reloadCluster.__set__('tClosers',{})
-	reloadCluster.__set__('tTracked',{})
-	fauxWorker = { 
-		'id' : "testid",
-		'isConnected' : () => { return(true) }, 
-		'isDead' : () => { return(false) } 
-	}
-	b = shouldTrackWorker(fauxWorker,false)
-	assert(b)
-	b = shouldTrackWorker(fauxWorker,true)
-	assert(!b)
-
-	fauxWorker = { 
-		'id' : "testid",
-		'isConnected' : () => { return(false) }, 
-		'isDead' : () => { return(true) } 
-	}
-	b = shouldTrackWorker(fauxWorker,false)
-	assert(!b)
-	b = shouldTrackWorker(fauxWorker,true)
-	assert(!b)
-
-	reloadCluster.__set__('tClosers',{})
-	reloadCluster.__set__('tTracked',{})
-	//
-	done()
-});
+		fauxWorker = { 
+			'id' : "testid",
+			'isConnected' : () => { return(false) }, 
+			'isDead' : () => { return(true) } 
+		}
+		b = shouldTrackWorker(fauxWorker,false)
+		assert(!b)
+		b = shouldTrackWorker(fauxWorker,true)
+		assert(!b)
 
 
+		fauxWorker = { 
+			'id' : "testid",
+			'isConnected' : () => { return(true) }, 
+			'isDead' : () => { return(false) } 
+		}
+		b = shouldTrackWorker(fauxWorker,false)
+		assert(!b)
+		b = shouldTrackWorker(fauxWorker,true)
+		assert(!b)
+
+		reloadCluster.__set__('tTracked',{})
+		reloadCluster.__set__('tClosers',{ 'testid' : w_info })
+		b = shouldTrackWorker(fauxWorker,false)
+		assert(!b)
+		b = shouldTrackWorker(fauxWorker,true)
+		assert(!b)
+		//
+		reloadCluster.__set__('tClosers',{})
+		reloadCluster.__set__('tTracked',{})
+		fauxWorker = { 
+			'id' : "testid",
+			'isConnected' : () => { return(true) }, 
+			'isDead' : () => { return(false) } 
+		}
+		b = shouldTrackWorker(fauxWorker,false)
+		assert(b)
+		b = shouldTrackWorker(fauxWorker,true)
+		assert(!b)
+
+		fauxWorker = { 
+			'id' : "testid",
+			'isConnected' : () => { return(false) }, 
+			'isDead' : () => { return(true) } 
+		}
+		b = shouldTrackWorker(fauxWorker,false)
+		assert(!b)
+		b = shouldTrackWorker(fauxWorker,true)
+		assert(!b)
+
+		reloadCluster.__set__('tClosers',{})
+		reloadCluster.__set__('tTracked',{})
+		//
+		done()
+	});
+
+	it('makes a cluster manager',done => {
+		var cluster = reloadCluster.__get__('cluster')
+
+		var testState = true;
+		var testDeath = false;
+
+		class ReWorker extends EventEmitter {
+			constructor(id) {
+				super()
+				this.id = id
+				this.is_connected = testState
+				this.is_dead = testDeath
+			}
+
+			isConnected() {
+				return(this.is_connected)
+			}
+
+			isDead() {
+				return this.is_dead;
+			}
+
+			kill(num) {
+
+			}
+		}
+ 
+		class ClusterBuster extends EventEmitter {
+
+			constructor() {
+				super()
+				this.workers = {}
+				this.settings = {}
+				this.count = 0
+			}
+
+			setupMaster(obj) {
+				//
+			}
+
+			fork() {
+				//
+				var w = new ReWorker(this.count++)
+				this.workers[this.count] = w
+				return(w)
+			}
+
+			disconnect() {
+				console.log('muster')
+			}
+		
+		}
+
+
+		var mycluster = new ClusterBuster();
+
+		reloadCluster.__set__('cluster',mycluster)
+		
+		
+		//
+		var CClass =  reloadCluster.__get__('ClusterManager')
+		class TestClass extends CClass {
+			constructor() {
+				super(__dirname + '/easystart.js',{ "workers" : 1, "logger" : mockLogger })
+			}
+		}
+		//
+		var mgCluster = new TestClass()
+		assert(mgCluster.numWorkers === 1)
+		//
+		mgCluster.doFork()
+		assert(Object.keys(mycluster.workers).length === 1)
+		console.log(mycluster.workers)
+		mycluster.workers[1].emit('error',{ message : 'this is a test'})
+		mycluster.workers[1].emit('message','this is a test')
+		//
+		clearInterval(mgCluster.healthCheckInterval)
+		mgCluster.stop()
+		//
+		mgCluster.countTracked()
+		mgCluster.countClosing()
+		mgCluster.countCluster()
+
+		//
+		mgCluster.refreshCache()
+		mycluster.workers[1].is_connected = false
+		mycluster.workers[1].is_dead = true
+
+		mgCluster.consonantProcesses()
+		mgCluster.forkWorkers()
+		//
+		testState = true;
+		testDeath = false;
+		mgCluster.forkWorkers()
+		//
+		//
+		mycluster.emit('listening',mycluster.workers[1],"1 First Str")
+		mycluster.emit('online',mycluster.workers[1])
+		mycluster.emit('exit',mycluster.workers[1])
+		mycluster.emit('disconnect',mycluster.workers[1])
+		//
+
+		 mgCluster.mayReload = false
+		 mgCluster.reload((msg) => {
+			 assert("reloadng not allowed at this time" === msg)
+		 })
+		 mgCluster.mayReload = true
+		 mgCluster.reloading = true
+		 mgCluster.reload((msg) => {
+			assert("busy reloadng" === msg)
+		})
+	  
+
+		//
+		reloadCluster.__set__('SAFETY_TIMEOUT',10)
+		mgCluster.terminate(() => {
+			reloadCluster.__set__('SAFETY_TIMEOUT',1000)
+		})
+		//
+
+		//
+		reloadCluster.__set__('cluster',cluster)
+
+		//
+		setTimeout(() => {
+			mgCluster.terminate(() => {
+				assert(true)
+				done()	
+			})
+		},1000)
+		
+	})
 
 
 
