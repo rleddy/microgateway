@@ -91,7 +91,6 @@ function initEMG() {
 }
 
 configureEMG() {
-
   local result=0
 
   logInfo "Configure EMG"

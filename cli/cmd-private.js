@@ -33,6 +33,32 @@ function authorize(options) {
 }
 
 
+function configureCheckOptions(options) {
+    //
+    if (!options.org) {
+        return options.error('org is required');
+    }
+
+    if (!options.env) {
+        return options.error('env is required');
+    }
+
+    if ( (options.key || options.cert) && !(options.key && options.cert) ) {
+        return options.error('key and cert must be passed together');
+    }
+    //
+    if (!options.runtimeUrl) {
+        return options.error('runtimeUrl is required');
+    }
+
+    if (!options.runtimeUrl.includes('http') || !options.mgmtUrl.includes('http') ) {
+        return options.error('runtimeUrl requires a prototcol http or https');
+    }
+    //
+    return(true)
+}
+
+
 module.exports = function() {
     //
     app
@@ -82,37 +108,22 @@ module.exports = function() {
         .option('-k  --key <key>', 'Path to private key to be used by Apigee Edge')
         .option('-s  --cert <cert>', 'Path to certificate to be used by Apigee Edge')
         .option('-d, --debug', 'execute with debug output')
-
         .action((options) => {
+            //
             options.error = optionError(options);
             options.token = options.token || process.env.EDGEMICRO_SAML_TOKEN;
             options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
 
-            if (!options.org) {
-                return options.error('org is required');
-            }
-
-            if (!options.env) {
-                return options.error('env is required');
-            }
-
-            if ( !((options.key !== undefined) && (options.cert !== undefined)) ) {
-                return options.error('key and cert must be passed together');
-            }
-            //
-            if (!options.runtimeUrl) {
-                return options.error('runtimeUrl is required');
-            }
-
-            if (!options.runtimeUrl.includes('http') || !options.mgmtUrl.includes('http') ) {
-                return options.error('runtimeUrl requires a prototcol http or https');
-            }
-
-            var auth = authorize(options)
-            if ( auth ) {
-                privateOperations.configureEdgemicro(options);
+            var optsOK = configureCheckOptions(options)
+            if ( optsOK ) {
+                var auth = authorize(options)
+                if ( auth ) {
+                    privateOperations.configureEdgemicro(options);
+                } else {
+                    return auth
+                }
             } else {
-                return auth
+                return optsOK
             }
 
         });

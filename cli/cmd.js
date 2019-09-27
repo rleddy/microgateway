@@ -185,6 +185,8 @@ function checkStartOptions(options) {
     if (!options.env) {
         return options.error('env is required');
     }
+
+    return true
 }
 
 
@@ -231,7 +233,7 @@ const setup = function setup() {
                 if (!options.username) {
                     return options.error('username is required');
                 }
-                if ( !(options.key && options.cert) ) {
+                if ( (options.key || options.cert) && !(options.key && options.cert) ) {
                     return options.error('key and cert must be passed together');
                 }
                 options.configDir = options.configDir || process.env.EDGEMICRO_CONFIG_DIR;
